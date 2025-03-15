@@ -105,8 +105,10 @@ bool MotorControlNode::initDynamixel()
   return true;
 }
 
-// 모터 초기설정 (토크 해제, 위치제어 모드, 최소/최대 위치 한계 설정, 토크 설정)
-bool setupMotor(uint8_t id)
+// change_set_mode : 0 - Operating Mode, 1 - Min Position Limit, 2 - Max Position Limit, 3 - Max Velocity Limit
+// change_set_value : 설정 값
+// change_set_mode가 -1일 경우 모두 기본값으로 설정
+bool setupMotor(uint8_t id, uint8_t change_set_mode, uint8_t change_set_value)
 {
   uint8_t dxl_error = 0;
   int dxl_set_result = COMM_TX_FAIL;
@@ -117,44 +119,123 @@ bool setupMotor(uint8_t id)
     return false;
   }
 
+switch (change_set)
+{
+case 0:
   // 모터 작동모드 설정 - 위치제어 모드(3)
-  if (!setOperatingMode(id, 3))
+  if (!setOperatingMode(id, change_set_value))
   {
     return false;
   }
+  break;
 
-  // // 최소 위치 한계 설정 (기본값: 0)
-  // dxl_set_result = packet_handler_->write4ByteTxRx(port_handler_, id, EEPROM::MIN_POSITION_LIMIT.first, 0, &dxl_error);
+case 1:
+  // 최소 위치 한계 설정 (기본값: 0)
+  dxl_set_result = packet_handler_->write4ByteTxRx(port_handler_, id, EEPROM::MIN_POSITION_LIMIT.first, change_set_value, &dxl_error);
 
-  // if (dxl_set_result != COMM_SUCCESS)
-  // {
-  //   RCLCPP_ERROR(this->get_logger(),
-  //               "Failed to set min position limit for ID %d: %s",
-  //               id, packet_handler_->getTxRxResult(dxl_set_result));
-  //   return false;
-  // }
+  if (dxl_set_result != COMM_SUCCESS)
+  {
+    RCLCPP_ERROR(this->get_logger(),
+                "Failed to set min position limit for ID %d: %s",
+                id, packet_handler_->getTxRxResult(dxl_set_result));
+    return false;
+  }
+  break;
 
-  // // 최대 위치 한계 설정 (기본값 : 4095)
-  // dxl_set_result = packet_handler_->write4ByteTxRx(port_handler_, id, EEPROM::MAX_POSITION_LIMIT.first, 4095, &dxl_error);
+case 2:
+  // 최대 위치 한계 설정 (기본값 : 4095)
+  dxl_set_result = packet_handler_->write4ByteTxRx(port_handler_, id, EEPROM::MAX_POSITION_LIMIT.first, change_set_value, &dxl_error);
 
-  // if (dxl_set_result != COMM_SUCCESS)
-  // {
-  //   RCLCPP_ERROR(this->get_logger(),
-  //               "Failed to set max position limit for ID %d: %s",
-  //               id, packet_handler_->getTxRxResult(dxl_set_result));
-  //   return false;
-  // }
+  if (dxl_set_result != COMM_SUCCESS)
+  {
+    RCLCPP_ERROR(this->get_logger(),
+                "Failed to set max position limit for ID %d: %s",
+                id, packet_handler_->getTxRxResult(dxl_set_result));
+    return false;
+  }
+  break;
 
-  // // 최대 속도 설정 (기본값 : 210)
-  // dxl_set_result = packet_handler_->write4ByteTxRx(port_handler_, id, EEPROM::VELOCITY_LIMIT.first, 210, &dxl_error);
-  //   if (dxl_set_result != COMM_SUCCESS)
-  // {
-  //   RCLCPP_ERROR(this->get_logger(),
-  //               "Failed to set max velocity limit for ID %d: %s",
-  //               id, packet_handler_->getTxRxResult(dxl_set_result));
-  //   return false;
-  // }
+case 3:
+  // 최대 속도 설정 (기본값 : 210)
+  dxl_set_result = packet_handler_->write4ByteTxRx(port_handler_, id, EEPROM::VELOCITY_LIMIT.first, change_set_value, &dxl_error);
+    if (dxl_set_result != COMM_SUCCESS)
+  {
+    RCLCPP_ERROR(this->get_logger(),
+                "Failed to set max velocity limit for ID %d: %s",
+                id, packet_handler_->getTxRxResult(dxl_set_result));
+    return false;
+  }
+  break;
 
+case 4:
+  // 가속도 제한 설정 (기본값: 32767)
+  dxl_set_result = packet_handler_->write4ByteTxRx(port_handler_, id, EEPROM::ACCELERATION_LIMIT.first, change_set_value, &dxl_error);
+
+  if (dxl_set_result != COMM_SUCCESS)
+  {
+    RCLCPP_ERROR(this->get_logger(),
+                "Failed to set acceleration limit for ID %d: %s",
+                id, packet_handler_->getTxRxResult(dxl_set_result));
+    return false;
+  }
+  break;
+
+case 5:
+// 온도 제한 설정 (기본값: 80)
+dxl_set_result = packet_handler_->write1ByteTxRx(port_handler_, id, EEPROM::TEMPERATURE_LIMIT.first, change_set_value, &dxl_error);
+
+if (dxl_set_result != COMM_SUCCESS)
+{
+  RCLCPP_ERROR(this->get_logger(),
+              "Failed to set temperature limit for ID %d: %s",
+              id, packet_handler_->getTxRxResult(dxl_set_result));
+  return false;
+}
+break;
+
+case 6:
+// 전류 제한 설정 (기본값: 2047)
+dxl_set_result = packet_handler_->write2ByteTxRx(port_handler_, id, EEPROM::CURRENT_LIMIT.first, change_set_value, &dxl_error);
+
+if (dxl_set_result != COMM_SUCCESS)
+{
+  RCLCPP_ERROR(this->get_logger(),
+              "Failed to set current limit for ID %d: %s",
+              id, packet_handler_->getTxRxResult(dxl_set_result));
+  return false;
+}
+break;
+
+case 7:
+// PWM 제한 설정 (기본값: 885)
+dxl_set_result = packet_handler_->write2ByteTxRx(port_handler_, id, EEPROM::PWM_LIMIT.first, change_set_value, &dxl_error);
+
+if (dxl_set_result != COMM_SUCCESS)
+{
+  RCLCPP_ERROR(this->get_logger(),
+              "Failed to set PWM limit for ID %d: %s",
+              id, packet_handler_->getTxRxResult(dxl_set_result));
+  return false;
+}
+break;
+
+case 8:
+// 셧다운 설정 (기본값: 52)
+dxl_set_result = packet_handler_->write1ByteTxRx(port_handler_, id, EEPROM::SHUTDOWN.first, change_set_value, &dxl_error);
+
+if (dxl_set_result != COMM_SUCCESS)
+{
+  RCLCPP_ERROR(this->get_logger(),
+              "Failed to set shutdown configuration for ID %d: %s",
+              id, packet_handler_->getTxRxResult(dxl_set_result));
+  return false;
+}
+break;
+
+default:
+  break;
+
+}
 
   // 토크 설정
   if (!setTorque(id, true))
