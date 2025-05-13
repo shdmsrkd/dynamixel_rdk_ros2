@@ -9,6 +9,10 @@
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
+  <depend>dynamixel_sdk_custom_interfaces</depend>
+  <depend>dynamixel_sdk</depend>
+  <depend>rclcpp</depend>
+
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
 
