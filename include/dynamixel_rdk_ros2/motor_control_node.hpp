@@ -14,20 +14,11 @@ public:
   MotorControlNode();
   virtual ~MotorControlNode();
 
-  struct MotorKinematics
-  {
-    double position;
-    double velocity;
-    double acceleration;
-  };
-
-  std::vector<MotorKinematics> motors;
-
   // 위치 설정 및 읽기 함수
   bool setGoalPosition(uint8_t id, uint32_t position);
   uint32_t getPresentPosition(uint8_t id);
 
-  bool setGoalPositionSync(u_int8_t id, uint32_t position);
+  bool setGoalPositionBulk();
 
 };
 

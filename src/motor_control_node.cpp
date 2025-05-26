@@ -27,13 +27,11 @@ MotorControlNode::MotorControlNode()
   // 모터 설정
   for (auto id : motor_ids_)
   {
-    if (!setupMotor(id, -1, -1))
+    if (!setupMotor(id, 100, 100))
     {
       RCLCPP_ERROR(this->get_logger(), "Failed to setup motor ID: %d", id);
     }
   }
-
-  setGoalPosition(1, 512); // 예시로 ID 1에 대해 목표 위치를 512로 설정
 }
 
 MotorControlNode::~MotorControlNode()
@@ -67,10 +65,41 @@ bool MotorControlNode::setGoalPosition(uint8_t id, uint32_t position)
   return true;
 }
 
-bool MotorControlNode::setGoalPositionSync(uint8_t id, uint32_t position)
+bool MotorControlNode::setGoalPositionBulk()
 {
+  int TOTAL_MOTOR = motor_ids_.size();
   dynamixel::GroupBulkWrite bulkWrite(port_handler_, packet_handler_);
+
+
+  // 다이나믹셀 모터를 5개씩 묶어서 처리
+  for (int i = 0; i < TOTAL_MOTOR; i += 5)
+  {
+    for (int j = 0; j < 5 && i + j < TOTAL_MOTOR; ++j)
+    {
+      bool dxl_addparam_result = bulkWrite.addParam(motor_ids_[i + j], MXRAM::GOAL_POSITION.first, 4, &(motors[i + j].position));
+      if (!dxl_addparam_result)
+      {
+        RCLCPP_ERROR(this->get_logger(),
+                    "Failed to add parameter to sync write on Dynamixel ID: %d",
+                    motor_ids_[i + j]);
+        return false;
+      }
+    }
+
+    int dxl_comm_result = bulkWrite.txPacket();
+    if (dxl_comm_result != COMM_SUCCESS)
+    {
+      RCLCPP_ERROR(this->get_logger(),
+                  "Failed to sync write goal position: %s",
+                  packet_handler_->getTxRxResult(dxl_comm_result));
+      return false;
+    }
+  }
+
+  return true;
+
 }
+
 
 uint32_t MotorControlNode::getPresentPosition(uint8_t id)
 {

@@ -3,40 +3,40 @@
 namespace dynamixel_rdk_ros2
 {
 
-using namespace dynamixel_rdk_ros2;
+  using namespace dynamixel_rdk_ros2;
 
-DynamixelCommunicationNode::DynamixelCommunicationNode()
-: BaseSettingNode("dynamixel_communication_node", rclcpp::NodeOptions())
+  DynamixelCommunicationNode::DynamixelCommunicationNode()
+      : BaseSettingNode("dynamixel_communication_node", rclcpp::NodeOptions())
+  {
+    // 외부 Publisher 초기화
+    status_republisher_ = this->create_publisher<dynamixel_sdk_custom_interfaces::msg::CurrentMotorStatus>("motor_status_repub", 10);
+
+    // 외부 Subscription 초기화
+
+    // 내부 Publisher 초기화
+
+    // 내부 Subscription 초기화
+    S2C_sub_ = this->create_subscription<CurrentMotorStatus>("S2C_topic", 10, std::bind(&DynamixelCommunicationNode::motor_status_callback, this, std::placeholders::_1));
+  }
+
+  void DynamixelCommunicationNode::motor_status_callback(const dynamixel_sdk_custom_interfaces::msg::CurrentMotorStatus::SharedPtr msg)
+  {
+    status_republisher_->publish(*msg);
+  }
+
+  DynamixelCommunicationNode::~DynamixelCommunicationNode()
+  {
+    RCLCPP_INFO(this->get_logger(), "Dynamixel Communication Node has been shut down");
+  }
+
+} // namespace dynamixel_rdk_ros2
+int main(int argc, char *argv[])
 {
-  // Publisher 초기화
-  publisher_ = this->create_publisher<dynamixel_sdk_custom_interfaces::msg::SetPosition>("set_position", 10);
-  // Timer 초기화
-  timer_ = this->create_wall_timer(
-    std::chrono::milliseconds(100),
-    std::bind(&DynamixelCommunicationNode::timer_callback, this));
+  rclcpp::init(argc, argv);
+  auto node = std::make_shared<dynamixel_rdk_ros2::DynamixelCommunicationNode>();
+  rclcpp::spin(node);
+  rclcpp::shutdown();
+  return 0;
 }
 
-DynamixelCommunicationNode::~DynamixelCommunicationNode()
-{
-  RCLCPP_INFO(this->get_logger(), "Dynamixel Communication Node has been shut down");
-}
-
-void DynamixelCommunicationNode::timer_callback()
-{
-  dynamixel_sdk_custom_interfaces::msg::SetPosition msg;
-  msg.id = 1;
-  msg.position = 512;
-  publisher_->publish(msg);
-  RCLCPP_INFO(this->get_logger(), "msg published: id=%d, position=%d", msg.id, msg.position);
-}
-}
-
-int main(int argc, char * argv[])
-{
-    rclcpp::init(argc, argv);
-    auto node = std::make_shared<dynamixel_rdk_ros2::DynamixelCommunicationNode>();
-    rclcpp::spin(node);
-    rclcpp::shutdown();
-    return 0;
-}
 // namespace dynamixel_rdk_ros2

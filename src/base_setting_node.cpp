@@ -12,7 +12,7 @@ namespace dynamixel_rdk_ros2
     // 노드 초기화
     RCLCPP_INFO(this->get_logger(), "Initializing Base Setting Node");
 
-    // 파라미터 초기화-
+    // 파라미터 초기화
     initParameters();
 
     // Dynamixel 초기화
@@ -24,7 +24,7 @@ namespace dynamixel_rdk_ros2
     // 모터 설정
     for (auto id : motor_ids_)
     {
-      if (!setupMotor(id, -1, -1))
+      if (!setupMotor(id, 100, 100))
       {
         RCLCPP_ERROR(this->get_logger(), "Failed to setup motor ID: %d", id);
       }
@@ -70,7 +70,8 @@ namespace dynamixel_rdk_ros2
     baud_rate_ = this->get_parameter("baud_rate").as_int();
     protocol_version_ = this->get_parameter("protocol_version").as_double();
     std::vector<int64_t> ids = this->get_parameter("motor_ids").as_integer_array();
-    for (size_t i = 0; i < ids.size(); ++i)
+
+    for (size_t i = 0; i < 2; i++)
     {
       motor_ids_.push_back(static_cast<uint8_t>(ids[i]));
     }
@@ -103,6 +104,29 @@ namespace dynamixel_rdk_ros2
     }
     return true;
   }
+
+  std::vector<uint8_t> BaseSettingNode::scanConnectedMotors()
+  {
+    std::vector<uint8_t> found_ids;
+
+    for (int id = 0; id < 253; ++id)
+    {
+      uint8_t dxl_error = 0;
+      uint16_t dxl_model_number = 0;
+
+      int dxl_comm_result = packet_handler_->ping(port_handler_, id, &dxl_model_number, &dxl_error);
+
+      if (dxl_comm_result == COMM_SUCCESS && dxl_error == 0)
+      {
+        found_ids.push_back(static_cast<uint8_t>(id));
+        std::cout << "Found motor ID: " << id << ", model number: " << dxl_model_number << std::endl;
+      }
+    }
+
+    return found_ids;
+  }
+
+
 
   bool BaseSettingNode::setTorque(uint8_t id, bool enable)
   {

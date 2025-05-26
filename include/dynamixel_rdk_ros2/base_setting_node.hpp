@@ -32,7 +32,18 @@ public:
   uint8_t dxl_error = 0;
   int dxl_comm_result = COMM_TX_FAIL;
 
+  struct MotorKinematics
+  {
+    int id;
+    uint8_t position;
+    double velocity;
+    double acceleration;
+  };
+  std::vector<MotorKinematics> motors;
+
 protected:
+  std::vector<uint8_t> scanConnectedMotors();
+
   // 파라미터
   std::string device_port_;
   int baud_rate_;
