@@ -1,4 +1,6 @@
 {
+  "C_Cpp.default.compileCommands": "/home/eungang/ros2_ws/build/compile_commands.json",
+
   "python.autoComplete.extraPaths": [
     "/home/eungang/ros2_ws/install/dynamixel_sdk_custom_interfaces/local/lib/python3.10/dist-packages",
     "/opt/ros/humble/lib/python3.10/site-packages",

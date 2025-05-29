@@ -19,6 +19,8 @@ public:
   uint32_t getPresentPosition(uint8_t id);
 
   bool setGoalPositionBulk();
+  bool switchTocurrentMode(uint8_t id);
+  bool setGoalCurrent(uint8_t id, uint16_t current);
 
 };
 

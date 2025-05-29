@@ -7,7 +7,6 @@
 #include "dynamixel_sdk_custom_interfaces/msg/current_motor_status.hpp"
 
 
-
 namespace dynamixel_rdk_ros2
 {
 class DynamixelCommunicationNode : public BaseSettingNode
@@ -20,6 +19,7 @@ public:
 private:
   // 외부 Publisher 초기화
   rclcpp::Publisher<dynamixel_sdk_custom_interfaces::msg::CurrentMotorStatus>::SharedPtr status_republisher_;
+  rclcpp::Publisher<dynamixel_sdk_custom_interfaces::msg::WarningStatus>::SharedPtr warning_status_republisher_;
 
   // 외부 Subscription 초기화
 
@@ -27,8 +27,11 @@ private:
 
   // 내부 Subscription 초기화
   rclcpp::Subscription<dynamixel_sdk_custom_interfaces::msg::CurrentMotorStatus>::SharedPtr S2C_sub_;
+  rclcpp::Subscription<dynamixel_sdk_custom_interfaces::msg::WarningStatus>::SharedPtr B2C_sub_;
+
 
   void motor_status_callback(const dynamixel_sdk_custom_interfaces::msg::CurrentMotorStatus::SharedPtr msg);
+  void motor_warning_callback(const dynamixel_sdk_custom_interfaces::msg::WarningStatus::SharedPtr msg);
 };
 }
 #endif  // DYNAMIXEL_COMMUNICATION_NODE_HPP_

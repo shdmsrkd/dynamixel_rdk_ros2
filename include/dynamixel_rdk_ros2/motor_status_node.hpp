@@ -18,12 +18,12 @@ namespace dynamixel_rdk_ros2
     bool getCurrentPosition(uint8_t id, u_int32_t &position);
     // bool getCurrentTemperaturesSync(const std::vector<uint8_t> &ids, std::vector<uint8_t> &temperatures);
     // bool getCurrentTorquesSync(const std::vector<uint8_t> &ids, std::vector<uint16_t> &torques);
-    bool getCurrentVelocity(uint8_t id, u_int8_t &velocity);
+    bool getCurrentVelocity(uint8_t id, uint8_t &velocity);
     bool getInputVoltage(uint8_t id, u_int16_t &voltage);
     bool HardwareErrorStatus(uint8_t id, uint8_t &error_status);
     bool getMovingStatus(uint8_t id, uint8_t &moving_status);
     bool getGoalPosition(uint8_t id, uint32_t &goal_position);
-    bool getCurrentTorque(u_int8_t id, u_int16_t &torque);
+    bool getCurrentTorque(uint8_t id, u_int16_t &torque);
     bool getCurrentTemperature(uint8_t id, uint8_t &temperature);
 
     // 모터 기본값 설정하는 함수 (Setter)
@@ -36,7 +36,10 @@ namespace dynamixel_rdk_ros2
     bool setPwmLimit();
     bool setShutdown();
 
+    // 기본값 변경함수
     bool DefaultSettingChange(uint8_t change_set_mode, uint8_t change_set_value_arr[]);
+
+    bool exceptionHandling();
 
     struct MotorSettings
     {

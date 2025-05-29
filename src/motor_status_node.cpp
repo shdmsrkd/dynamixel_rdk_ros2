@@ -18,6 +18,7 @@ namespace dynamixel_rdk_ros2
   {
     RCLCPP_INFO(this->get_logger(), "Initializing Motor Status Node");
 
+    S2C_pub_ = this->create_publisher<dynamixel_sdk_custom_interfaces::msg::CurrentMotorStatus>("S2C_topic", 10);
     // 벡터 크기 초기화 (ID를 인덱스로 사용하기 위해 최대 ID + 1 크기로 초기화)
     uint8_t max_id = 0;
     for (const auto &id : motor_ids_)
@@ -29,8 +30,6 @@ namespace dynamixel_rdk_ros2
     // 벡터 초기화 (ID를 인덱스로 사용하기 위해 최대 ID + 1 크기로 초기화)
     motors_setting.resize(max_id + 1);
 
-    S2C_pub_ = this->create_publisher<dynamixel_sdk_custom_interfaces::msg::CurrentMotorStatus>("S2C_topic", 10);
-
     getting_timer_ = this->create_wall_timer(
         std::chrono::milliseconds(100),
         std::bind(&MotorStatusNode::timer_callback, this));
@@ -39,7 +38,7 @@ namespace dynamixel_rdk_ros2
   MotorStatusNode::~MotorStatusNode()
   {
     // 모든 모터 토크 해제
-    for (auto id : motor_ids_)
+    for (auto id : connected_motor_ids_)
     {
       setTorque(id, false);
     }
@@ -193,7 +192,7 @@ namespace dynamixel_rdk_ros2
     return true;
   }
 
-  bool MotorStatusNode::getInputVoltage(uint8_t id, u_int16_t &voltage)
+  bool MotorStatusNode::getInputVoltage(uint8_t id, uint16_t &voltage)
   {
     dxl_error = 0;
     dxl_comm_result = COMM_TX_FAIL;
@@ -242,6 +241,10 @@ namespace dynamixel_rdk_ros2
     dxl_error = 0;
     dxl_comm_result = COMM_TX_FAIL;
 
+    uint32_t threshold = 100;
+
+    dxl_comm_result = packet_handler_->write4ByteTxRx(port_handler_, id, EEPROM::MOVING_THRESHOLD.first, threshold, &dxl_error);
+
     dxl_comm_result = packet_handler_->read1ByteTxRx(port_handler_, id, MXRAM::MOVING_STATUS.first, &moving_status, &dxl_error);
 
     if (dxl_comm_result != COMM_SUCCESS)
@@ -283,56 +286,63 @@ namespace dynamixel_rdk_ros2
 
   // -------------------------------------------------------------- Motor Status Getter --------------------------------------------------------------
 
-void MotorStatusNode::timer_callback()
-{
-  dynamixel_sdk_custom_interfaces::msg::CurrentMotorStatus msg;
-  size_t total_motors = motor_ids_.size();
-
-  // 각 벡터를 모터 수만큼 resize
-  msg.id.resize(total_motors);
-  msg.position.resize(total_motors);
-  msg.velocity.resize(total_motors);
-  msg.temperature.resize(total_motors);
-  msg.torque.resize(total_motors);
-  msg.input_voltage.resize(total_motors);
-  msg.moving_status.resize(total_motors);
-
-  for (size_t i = 0; i < total_motors; ++i)
+  void MotorStatusNode::timer_callback()
   {
-    uint8_t id = motor_ids_[i];
-    RCLCPP_INFO(this->get_logger(), "\n\n현재 처리 중인 ID: %d", id);
+    motorCheck(); // 연결 상태 갱신
 
-    uint8_t temperature = 0;
-    uint16_t torque = 0;
-    uint32_t position = 0;
-    uint8_t velocity = 0;
-    uint16_t voltage = 0;
-    uint8_t moving_status = 0;
+    dynamixel_sdk_custom_interfaces::msg::CurrentMotorStatus msg;
+    size_t total_motors = connected_motor_ids_.size();
 
-    // 모터 정보 수집
-    getCurrentTemperature(id, temperature);
-    getCurrentTorque(id, torque);
-    getCurrentPosition(id, position);
-    getCurrentVelocity(id, velocity);
-    getInputVoltage(id, voltage);
-    getMovingStatus(id, moving_status);
+    // resize 연결된 모터 수 만큼
+    msg.id.resize(total_motors);
+    msg.position.resize(total_motors);
+    msg.velocity.resize(total_motors);
+    msg.temperature.resize(total_motors);
+    msg.torque.resize(total_motors);
+    msg.input_voltage.resize(total_motors);
+    msg.moving_status.resize(total_motors);
 
-    // 메시지에 데이터 저장
-    msg.id[i] = id;
-    msg.position[i] = position;
-    msg.velocity[i] = velocity;
-    msg.temperature[i] = temperature;
-    msg.torque[i] = torque;
-    msg.input_voltage[i] = voltage;
-    msg.moving_status[i] = moving_status;
+    for (size_t i = 0; i < total_motors; ++i)
+    {
+      uint8_t id = connected_motor_ids_[i];
+      msg.id[i] = id;
 
-    RCLCPP_INFO(this->get_logger(), "ID: %d | Pos: %u | Vel: %u | Temp: %u | Torque: %u | Volt: %u | Moving: %u",
-                id, position, velocity, temperature, torque, voltage, moving_status);
+      RCLCPP_INFO(this->get_logger(), "\n\n현재 처리 중인 ID: %d", id);
+
+      uint8_t temperature = 0;
+      uint16_t torque = 0;
+      uint32_t position = 0;
+      uint8_t velocity = 0;
+      uint16_t voltage = 0;
+      uint8_t moving_status = 0;
+
+      // 연결된 모터에 대해서만 정보 수집
+      getCurrentTemperature(id, temperature);
+      getCurrentTorque(id, torque);
+      getCurrentPosition(id, position);
+      getCurrentVelocity(id, velocity);
+
+      if(voltage < 60000)
+      {
+        getInputVoltage(id, voltage);
+      }
+      getMovingStatus(id, moving_status);
+
+      msg.position[i] = position;
+      msg.velocity[i] = velocity;
+      msg.temperature[i] = temperature;
+      msg.torque[i] = torque;
+      msg.input_voltage[i] = voltage;
+      msg.moving_status[i] = moving_status;
+
+      RCLCPP_INFO(this->get_logger(), "ID: %d | Pos: %u | Vel: %u | Temp: %u | Torque: %u | Volt: %u | Moving: %u",
+                  id, position, velocity, temperature, torque, voltage, moving_status);
+    }
+
+    RCLCPP_INFO(this->get_logger(), "모터 상태 퍼블리시");
+    RCLCPP_INFO(this->get_logger(), "총 연결된 모터 개수: %ld", total_motors);
+    S2C_pub_->publish(msg);
   }
-
-  RCLCPP_INFO(this->get_logger(), "모터 상태 퍼블리시");
-  S2C_pub_->publish(msg);
-}
 
   // -------------------------------------------------------------- Motor Status Setter --------------------------------------------------------------
 

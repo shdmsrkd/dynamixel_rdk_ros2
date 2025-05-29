@@ -5,12 +5,13 @@ namespace dynamixel_rdk_ros2
 
   using namespace dynamixel_rdk_ros2;
 
-  BaseSettingNode::BaseSettingNode(const std::string &node_name,const rclcpp::NodeOptions &options)
+  BaseSettingNode::BaseSettingNode(const std::string &node_name, const rclcpp::NodeOptions &options)
       : rclcpp::Node(node_name, options)
   {
-
     // 노드 초기화
     RCLCPP_INFO(this->get_logger(), "Initializing Base Setting Node");
+
+    B2C_pub_ = this->create_publisher<dynamixel_sdk_custom_interfaces::msg::WarningStatus>("B2C_topic", 10);
 
     // 파라미터 초기화
     initParameters();
@@ -22,20 +23,19 @@ namespace dynamixel_rdk_ros2
     }
 
     // 모터 설정
-    for (auto id : motor_ids_)
+    for (auto id : connected_motor_ids_)
     {
       if (!setupMotor(id, 100, 100))
       {
         RCLCPP_ERROR(this->get_logger(), "Failed to setup motor ID: %d", id);
       }
     }
-
   }
 
   BaseSettingNode::~BaseSettingNode()
   {
     // 모든 모터 토크 해제
-    for (auto id : motor_ids_)
+    for (auto id : connected_motor_ids_)
     {
       setTorque(id, false);
     }
@@ -53,27 +53,48 @@ namespace dynamixel_rdk_ros2
     {
       this->declare_parameter("device_port", "/dev/ttyUSB0");
     }
-    if(!this->has_parameter("baud_rate"))
+    if (!this->has_parameter("baud_rate"))
     {
       this->declare_parameter("baud_rate", 1000000);
     }
-    if(!this->has_parameter("protocol_version"))
+    if (!this->has_parameter("protocol_version"))
     {
       this->declare_parameter("protocol_version", 2.0);
     }
-    if(!this->has_parameter("motor_ids"))
+    if (!this->has_parameter("dynamixels.ids"))
     {
-      this->declare_parameter("motor_ids", std::vector<int64_t>{1});
+      this->declare_parameter("dynamixels.ids", std::vector<int64_t>{1});
     }
+    if (!this->has_parameter("dynamixels.max_position_limits"))
+    {
+      this->declare_parameter("dynamixels.max_position_limits", std::vector<double>{M_PI});
+    }
+    if (!this->has_parameter("dynamixels.min_position_limits"))
+    {
+      this->declare_parameter("dynamixels.min_position_limits", std::vector<double>{-M_PI});
+    }
+    if (!this->has_parameter("dynamixels.max_velocity_limits"))
+    {
+      this->declare_parameter("dynamixels.max_velocity_limits", std::vector<int64_t>{1});
+    }
+    if (!this->has_parameter("dynamixels.temperature_limits"))
+    {
+      this->declare_parameter("dynamixels.temperature_limits", std::vector<int64_t>{-1});
+    }
+
     // 파라미터 가져오기
     device_port_ = this->get_parameter("device_port").as_string();
     baud_rate_ = this->get_parameter("baud_rate").as_int();
     protocol_version_ = this->get_parameter("protocol_version").as_double();
-    std::vector<int64_t> ids = this->get_parameter("motor_ids").as_integer_array();
+    std::vector<int64_t> ids = this->get_parameter("dynamixels.ids").as_integer_array();
+    max_position_limits_ = get_parameter("dynamixels.max_position_limits").as_double_array();
+    min_position_limits_ = get_parameter("dynamixels.min_position_limits").as_double_array();
+    std::vector<int64_t> max_velocity_limits = get_parameter("dynamixels.max_velocity_limits").as_integer_array();
+    std::vector<int64_t> temperature_limits = get_parameter("dynamixels.temperature_limits").as_integer_array();
 
-    for (size_t i = 0; i < 2; i++)
+    for (auto &id : ids)
     {
-      motor_ids_.push_back(static_cast<uint8_t>(ids[i]));
+      motor_ids_.push_back(static_cast<uint8_t>(id));
     }
 
     // 파라미터 출력
@@ -102,30 +123,83 @@ namespace dynamixel_rdk_ros2
       RCLCPP_ERROR(this->get_logger(), "Failed to set baud rate: %d", baud_rate_);
       return false;
     }
+
+    motorCheck();
+
     return true;
   }
 
-  std::vector<uint8_t> BaseSettingNode::scanConnectedMotors()
+  bool BaseSettingNode::pingMotor(int id)
   {
-    std::vector<uint8_t> found_ids;
+    uint8_t dxl_error = 0;
+    int dxl_comm_result = packet_handler_->ping(port_handler_, id, &dxl_error);
 
-    for (int id = 0; id < 253; ++id)
+    if (dxl_comm_result == COMM_SUCCESS)
     {
-      uint8_t dxl_error = 0;
-      uint16_t dxl_model_number = 0;
-
-      int dxl_comm_result = packet_handler_->ping(port_handler_, id, &dxl_model_number, &dxl_error);
-
-      if (dxl_comm_result == COMM_SUCCESS && dxl_error == 0)
-      {
-        found_ids.push_back(static_cast<uint8_t>(id));
-        std::cout << "Found motor ID: " << id << ", model number: " << dxl_model_number << std::endl;
-      }
+      return true;
     }
-
-    return found_ids;
+    else
+    {
+      return false;
+    }
   }
 
+bool BaseSettingNode::motorCheck()
+{
+  dynamixel_sdk_custom_interfaces::msg::WarningStatus msg;
+
+  connected_motor_ids_.clear();
+  disconnected_motor_ids_.clear();
+
+  if (motor_ids_.empty())
+  {
+    return false;
+  }
+
+  for (const auto &id : motor_ids_)
+  {
+    if (pingMotor(id))
+    {
+      connected_motor_ids_.push_back(id);
+      msg.connected_motor_ids.push_back(id);
+    }
+    else
+    {
+      disconnected_motor_ids_.push_back(id);
+      msg.disconnected_motor_ids.push_back(id);
+    }
+  }
+
+  for (const auto &id : connected_motor_ids_)
+  {
+    RCLCPP_INFO(this->get_logger(), "Connected motor ID: %d", id);
+  }
+
+  for (const auto &id : disconnected_motor_ids_)
+  {
+    RCLCPP_WARN(this->get_logger(), "Disconnected motor ID: %d", id);
+  }
+
+  B2C_pub_->publish(msg);
+  return true;
+}
+
+void BaseSettingNode::setupTorqueJudgment(bool enable)
+{
+  if (!motorCheck())
+  {
+    RCLCPP_WARN(this->get_logger(), "No motors found to check.");
+    return;
+  }
+
+  for (const auto &id : connected_motor_ids_)
+  {
+    if (!setTorque(id, enable))
+    {
+      RCLCPP_ERROR(this->get_logger(), "Failed to set torque for motor ID %d", id);
+    }
+  }
+}
 
 
   bool BaseSettingNode::setTorque(uint8_t id, bool enable)
@@ -305,4 +379,5 @@ namespace dynamixel_rdk_ros2
     return true;
   }
 }
+
 // namespace dynamixel_rdk_ros2
