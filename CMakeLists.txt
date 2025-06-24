@@ -14,35 +14,45 @@ find_package(dynamixel_sdk_custom_interfaces REQUIRED)
 # -------------------------------
 # BaseSettingNode 라이브러리
 # -------------------------------
-add_library(base_setting_node
-  src/base_setting_node.cpp
-)
+# add_library(base_setting_node
+#   src/base_setting_node.cpp
+# )
 
-target_include_directories(base_setting_node PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include>
-)
+# target_include_directories(base_setting_node PUBLIC
+#   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+#   $<INSTALL_INTERFACE:include>
+# )
 
-ament_target_dependencies(base_setting_node
-  rclcpp
-  dynamixel_sdk
-  dynamixel_sdk_custom_interfaces
-)
+# ament_target_dependencies(
+#   base_setting_node
+#   rclcpp
+#   dynamixel_sdk
+#   dynamixel_sdk_custom_interfaces
+# )
 
 # -------------------------------
 # 실행 파일들
 # -------------------------------
+
+# EXECUTABLES 리스트를 먼저 정의
 set(EXECUTABLES
-  motor_control_node
-  motor_status_node
-  dynamixel_communication_node
+  # motor_control_node
+  # motor_status_node
+  # dynamixel_communication_node
+  dynamixel_rdk_ros2
 )
 
+# 각 실행 파일 생성
 foreach(executable ${EXECUTABLES})
   add_executable(${executable} src/${executable}.cpp)
 
-  target_link_libraries(${executable}
-    base_setting_node
+  # target_link_libraries(${executable}
+  #   base_setting_node
+  # )
+
+  target_include_directories(${executable} PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
   )
 
   ament_target_dependencies(${executable}
@@ -57,7 +67,7 @@ endforeach()
 # -------------------------------
 install(TARGETS
   ${EXECUTABLES}
-  base_setting_node
+  # base_setting_node
   DESTINATION lib/${PROJECT_NAME}
 )
 

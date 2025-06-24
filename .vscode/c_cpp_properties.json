@@ -15,6 +15,7 @@
         "/home/eungang/ros2_ws/src/dynamixel_rdk_interface/include/**",
         "/home/eungang/ros2_ws/src/dynamixel_rdk_ros2/dynamixel_rdk_ros2/include/**",
         "/home/eungang/ros2_ws/src/test_communication_pkg/include/**",
+        "/home/eungang/ros2_ws/src/dynamixel_rdk_ros2/include/dynamixel_rdk_ros2/include/**",
         "/usr/include/**",
         "${workspaceFolder}/**",
         "/home/eungang/ros2_ws/install/**",
