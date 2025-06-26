@@ -4,7 +4,6 @@
 #include <rclcpp/rclcpp.hpp>
 #include <vector>
 #include "dynamixel_rdk_ros2/control_table.hpp"
-#include "dynamixel_rdk_ros2/base_setting_node.hpp"
 #include "dynamixel_sdk/dynamixel_sdk.h"
 #include "dynamixel_sdk_custom_interfaces/msg/current_motor_status.hpp"
 #include "dynamixel_sdk_custom_interfaces/msg/warning_status.hpp"
@@ -26,6 +25,15 @@
 #define PWM_LIMIT_CASE 6
 #define SHUTDOWN_CASE 7
 
+#define READ 0
+#define WRITE 1
+
+#define TORQUEOFF 0
+#define TORQUEON 1
+
+#define CURRENT_CONTROL_MODE 0
+
+
 
 
 namespace dynamixel_rdk_ros2
@@ -33,32 +41,32 @@ namespace dynamixel_rdk_ros2
   class dynamixel_rdk_ros2 : public rclcpp::Node
   {
   public:
-    // 구조체 정의
-    struct MotorKinematics
-    {
-      int id;
-      uint8_t position;
-      double velocity;
-    };
-
     struct MotorSettings
     {
-      uint8_t min_position_limit;
-      uint8_t max_position_limit;
+      uint32_t min_position_limit;
+      uint32_t max_position_limit;
 
-      uint8_t max_velocity_limit;
-      uint8_t max_acceleration_limit;
+      uint32_t max_velocity_limit;
+      uint32_t max_acceleration_limit;
 
       uint8_t temperature_limit;
-      uint8_t current_limit;
-      uint8_t pwm_limit;
+      uint16_t current_limit;
+      uint16_t pwm_limit;
       uint8_t shutdown;
     };
-    // 모터 설정
-    std::vector<MotorSettings> motors_setting;
+
+    struct MotorStatus
+    {
+      uint32_t position, goal_position;
+      uint8_t velocity, temperature, moving_status, error_status;
+      uint16_t voltage, torque;
+    };
+
+    std::vector<MotorSettings> motor_settings;
+    std::vector<MotorStatus> motor_status;
+
 
     bool SendMotorPacket();
-
 
     // 생성자 및 소멸자
     dynamixel_rdk_ros2();
@@ -81,8 +89,8 @@ namespace dynamixel_rdk_ros2
     // public 멤버 변수들
     uint8_t dxl_error;
     int dxl_comm_result;
-    std::vector<MotorKinematics> motors;
     double dxl_rps_ratio, dxl_acc_ratio, dxl_current_ratio;
+    int TOTAL_MOTOR;
 
   protected:
     // 파라미터들
@@ -98,19 +106,12 @@ namespace dynamixel_rdk_ros2
     dynamixel::PacketHandler *packet_handler_;
 
   private:
-    // private 멤버 변수들
-    // std::vector<double> max_position_limits_;
-    // std::vector<double> min_position_limits_;
 
     // 템플릿
     template<typename T>
-    bool TxRx(uint8_t id, const std::pair<int, int> &control_table_adress, T &value, const std::string &status_name);
-
-    template<typename D>
-    bool SyncRead(const std::pair<int, int> &control_table_adress, D &status_save, const std::string &status_name, int batch_size = 5);
-
-
-
+    bool TxRx(uint8_t id, const std::pair<int, int> &control_table_adress, T &value, const std::string &status_name, int mode);
+    bool SyncRead(const std::pair<int, int> &control_table_address, std::vector<MotorStatus> &status_values, const std::string &status_name);
+    bool BulkWrite(const std::pair<int, int> &control_table_address, const std::vector<MotorSettings> &values, const std::string &status_name);
     // Publisher들
     rclcpp::Publisher<dynamixel_sdk_custom_interfaces::msg::CurrentMotorStatus>::SharedPtr motor_status_pubisher_;
     rclcpp::Publisher<dynamixel_sdk_custom_interfaces::msg::WarningStatus>::SharedPtr warning_status_publisher_;
@@ -132,14 +133,14 @@ namespace dynamixel_rdk_ros2
     bool HardwareErrorStatus(uint8_t id, uint8_t &error_status);
 
     // 모터 상태 읽기 함수들(Getter) - Sync
-    bool getCurrentPositionSync(uint32_t &position);
-    bool getGoalPositionSync(uint32_t &goal_position);
-    bool getCurrentVelocitySync(uint8_t &velocity);
-    bool getInputVoltageSync(uint16_t &voltage);
-    bool getCurrentTemperatureSync(uint8_t &temperature);
-    bool getCurrentTorqueSync(uint16_t &torque);
-    bool getMovingStatusSync(uint8_t &moving_status);
-    bool HardwareErrorStatusSync(uint8_t &error_status);
+    bool getCurrentPositionSync();
+    bool getGoalPositionSync();
+    bool getCurrentVelocitySync();
+    bool getInputVoltageSync();
+    bool getCurrentTemperatureSync();
+    bool getCurrentTorqueSync();
+    bool getMovingStatusSync();
+    bool HardwareErrorStatusSync();
 
     // 모터 기본값 설정 함수들(Setter)
     bool setMinPositionLimit();
@@ -156,7 +157,7 @@ namespace dynamixel_rdk_ros2
     bool setGoalPosition(uint8_t id, uint32_t position);
     bool setGoalCurrent(uint8_t id, uint16_t current);
     bool setGoalPositionBulk();
-    bool switchTocurrentMode(uint8_t id);
+    bool switchTocurrentMode(uint8_t id, uint8_t mode = CURRENT_CONTROL_MODE);
 
     struct MotorControl
     {
@@ -178,10 +179,19 @@ namespace dynamixel_rdk_ros2
     void timer_callback();
     bool errorInterface(uint8_t id);
     void dynamixel_control_callback(const dynamixel_sdk_custom_interfaces::msg::DynamixelControlMsgs & msg);
+    void dxl_variable_init();
+    void ResizeMsg(dynamixel_sdk_custom_interfaces::msg::CurrentMotorStatus &msg, size_t size);
+    void msgUpdate(dynamixel_sdk_custom_interfaces::msg::CurrentMotorStatus &msg, size_t index,
+                   uint32_t position, uint8_t velocity, uint16_t voltage,
+                   uint8_t temperature, uint16_t torque, uint8_t moving_status, uint8_t error_status);
 
-    int posToRadian(int position)
+
+    void divide_byte(std::vector<uint8_t> & data, int address, int byte_size);
+
+    int32_t radianToTick(double rad)
     {
-      return (static_cast<int>(position)) * (2.0 * M_PI / 4095.0);
+      rad = std::clamp(rad, -M_PI, M_PI);
+      return static_cast<int32_t>((rad + M_PI) * (4095.0 / (2 * M_PI)));
     }
 
     int velToRadian(int velocity)

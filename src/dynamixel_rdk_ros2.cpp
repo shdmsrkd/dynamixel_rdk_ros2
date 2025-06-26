@@ -9,6 +9,9 @@ namespace dynamixel_rdk_ros2
     warning_status_publisher_ = this->create_publisher<dynamixel_sdk_custom_interfaces::msg::WarningStatus>("motor_warning", 10);
 
     // 외부 Subscription 초기화
+    ik2rdk_sub = create_subscription<dynamixel_sdk_custom_interfaces::msg::DynamixelControlMsgs>(
+        "dynamixel_control", 10,
+        std::bind(&dynamixel_rdk_ros2::dynamixel_control_callback, this, std::placeholders::_1));
 
     // 파라미터 초기화
     initParameters();
@@ -17,21 +20,16 @@ namespace dynamixel_rdk_ros2
     initDynamixel();
 
     // 모터 기본값 설정
-    int8_t exarray[256] = {
-        0,
-    };
+    int8_t exarray[256] = {0, };
     DefaultSettingChange(-1, exarray);
 
     dxl_current_ratio = MX_CURRENT_PROFILE;
     dxl_rps_ratio = MX_RPS_PROFILE * M_PI / 30;
     dxl_acc_ratio = MX_ACC_PROFILE * M_PI / 1800;
+    std::vector<MotorStatus> motor_status(TOTAL_MOTOR + 1);
 
     // 타이머
     getting_timer_ = this->create_wall_timer(std::chrono::milliseconds(10), std::bind(&dynamixel_rdk_ros2::timer_callback, this));
-
-    // ik2rdk_sub = create_subscription<dynamixel_sdk_custom_interfaces::msg::DynamixelControlMsgs>(
-    //     "dynamixel_control", 10,
-    //     std::bind(&dynamixel_rdk_ros2::dynamixel_control_callback, this, std::placeholders::_1));
   }
 
   dynamixel_rdk_ros2::~dynamixel_rdk_ros2()
@@ -74,6 +72,8 @@ namespace dynamixel_rdk_ros2
     {
       motor_ids_.push_back(static_cast<uint8_t>(ids[i]));
     }
+
+    TOTAL_MOTOR = motor_ids_.size();
 
     // 파라미터 출력
     RCLCPP_INFO(this->get_logger(), "Device port: %s", device_port_.c_str());
@@ -179,39 +179,13 @@ namespace dynamixel_rdk_ros2
 
   bool dynamixel_rdk_ros2::setTorque(uint8_t id, bool enable)
   {
-    dxl_error = 0;
-    dxl_comm_result = COMM_TX_FAIL;
-
-    dxl_comm_result = packet_handler_->write1ByteTxRx(port_handler_, id, MXRAM::TORQUE_ENABLE.first, enable, &dxl_error);
-
-    if (dxl_comm_result != COMM_SUCCESS)
-    {
-      RCLCPP_ERROR(this->get_logger(),
-                   "Failed to set torque for ID %d: %s",
-                   id, packet_handler_->getTxRxResult(dxl_comm_result));
-      return false;
-    }
-
-    return true;
+    return TxRx(id, MXRAM::TORQUE_ENABLE, enable, "Torque Enable", WRITE);
   }
 
   // 0 - Current Control Mode, 1 - Velocity Control Mode, 3(Default) - Position Control Mode, 4 - Extended Position Control Mode (Multi-turn), 5 - Current-based Position Control Mode, 16 - PWM Control Mode
   bool dynamixel_rdk_ros2::setOperatingMode(uint8_t id, uint8_t mode)
   {
-    dxl_error = 0;
-    dxl_comm_result = COMM_TX_FAIL;
-
-    dxl_comm_result = packet_handler_->write1ByteTxRx(port_handler_, id, EEPROM::OPERATING_MODE.first, mode, &dxl_error);
-
-    if (dxl_comm_result != COMM_SUCCESS)
-    {
-      RCLCPP_ERROR(this->get_logger(),
-                   "Failed to set operating mode for ID %d: %s",
-                   id, packet_handler_->getTxRxResult(dxl_comm_result));
-      return false;
-    }
-
-    return true;
+    return TxRx(id, EEPROM::OPERATING_MODE, mode, "Operating Mode", WRITE);
   }
 
   // change_set_mode : 0 - Operating Mode, 1 - Min Position Limit, 2 - Max Position Limit, 3 - Max Velocity Limit, 4 - Acceleration Limit, 5 - Temperature Limit, 6 - Current Limit, 7 - PWM Limit, 8 - Shutdown
@@ -219,11 +193,10 @@ namespace dynamixel_rdk_ros2
   // change_set_mode가 -1일 경우 모두 기본값으로 설정
   bool dynamixel_rdk_ros2::setupMotor(uint8_t id, uint8_t change_set_mode, uint8_t change_set_value)
   {
-    dxl_error = 0;
-    dxl_comm_result = COMM_TX_FAIL;
+    dxl_variable_init();
 
     // 토크 해제
-    if (!setTorque(id, false))
+    if (!setTorque(id, TORQUEOFF))
     {
       return false;
     }
@@ -346,7 +319,7 @@ namespace dynamixel_rdk_ros2
     }
 
     // 토크 설정
-    if (!setTorque(id, true))
+    if (!setTorque(id, TORQUEON))
     {
       return false;
     }
@@ -358,398 +331,126 @@ namespace dynamixel_rdk_ros2
 
   bool dynamixel_rdk_ros2::getCurrentPosition(uint8_t id, uint32_t &position)
   {
-    return TxRx(id, MXRAM::PRESENT_POSITION, position, "Current Position");
+    return TxRx(id, MXRAM::PRESENT_POSITION, position, "Current Position", READ);
   }
 
   bool dynamixel_rdk_ros2::getGoalPosition(uint8_t id, uint32_t &goal_position)
   {
-    return TxRx(id, MXRAM::GOAL_POSITION, goal_position, "Goal Position");
+    return TxRx(id, MXRAM::GOAL_POSITION, goal_position, "Goal Position", READ);
   }
 
   bool dynamixel_rdk_ros2::getCurrentVelocity(uint8_t id, uint8_t &velocity)
   {
-    return TxRx(id, MXRAM::PRESENT_VELOCITY, velocity, "Current Velocity");
+    return TxRx(id, MXRAM::PRESENT_VELOCITY, velocity, "Current Velocity", READ);
   }
 
   bool dynamixel_rdk_ros2::getInputVoltage(uint8_t id, uint16_t &voltage)
   {
-    return TxRx(id, MXRAM::PRESENT_INPUT_VOLTAGE, voltage, "Input Voltage");
+    return TxRx(id, MXRAM::PRESENT_INPUT_VOLTAGE, voltage, "Input Voltage", READ);
   }
 
   bool dynamixel_rdk_ros2::getCurrentTemperature(uint8_t id, uint8_t &temperature)
   {
-    return TxRx(id, MXRAM::PRESENT_TEMPERATURE, temperature, "Current Temperature");
+    return TxRx(id, MXRAM::PRESENT_TEMPERATURE, temperature, "Current Temperature", READ);
   }
 
   bool dynamixel_rdk_ros2::getCurrentTorque(uint8_t id, uint16_t &torque)
   {
-    return TxRx(id, MXRAM::PRESENT_CURRENT, torque, "Current Torque");
+    return TxRx(id, MXRAM::PRESENT_CURRENT, torque, "Current Torque", READ);
   }
 
   bool dynamixel_rdk_ros2::getMovingStatus(uint8_t id, uint8_t &moving_status)
   {
-    return TxRx(id, MXRAM::MOVING_STATUS, moving_status, "Moving Status");
+    return TxRx(id, MXRAM::MOVING_STATUS, moving_status, "Moving Status", READ);
   }
 
   bool dynamixel_rdk_ros2::HardwareErrorStatus(uint8_t id, uint8_t &error_status)
   {
-    return TxRx(id, MXRAM::HARDWARE_ERROR_STATUS, error_status, "Hardware Error Status");
+    return TxRx(id, MXRAM::HARDWARE_ERROR_STATUS, error_status, "Hardware Error Status", READ);
   }
 
   // -------------------------------------------------------------- Motor Status Getter (Sync) --------------------------------------------------------------
 
-  bool dynamixel_rdk_ros2::getCurrentPositionSync(uint32_t &position)
+  bool dynamixel_rdk_ros2::getCurrentPositionSync()
   {
-    return SyncRead(MXRAM::PRESENT_POSITION, position, "Current Position");
+    return SyncRead(MXRAM::PRESENT_POSITION, motor_status, "Current Position");
   }
 
-  bool dynamixel_rdk_ros2::getGoalPositionSync(uint32_t &goal_position)
+  bool dynamixel_rdk_ros2::getGoalPositionSync()
   {
-    return SyncRead(MXRAM::GOAL_POSITION, goal_position, "Goal Position");
+    return SyncRead(MXRAM::GOAL_POSITION, motor_status, "Goal Position");
   }
 
-  bool dynamixel_rdk_ros2::getCurrentVelocitySync(uint8_t &velocity)
+  bool dynamixel_rdk_ros2::getCurrentVelocitySync()
   {
-    return SyncRead(MXRAM::PRESENT_VELOCITY, velocity, "Current Velocity");
+    return SyncRead(MXRAM::PRESENT_VELOCITY, motor_status, "Current Velocity");
   }
 
-  bool dynamixel_rdk_ros2::getInputVoltageSync(uint16_t &voltage)
+  bool dynamixel_rdk_ros2::getInputVoltageSync()
   {
-    return SyncRead(MXRAM::PRESENT_INPUT_VOLTAGE, voltage, "Input Voltage");
+    return SyncRead(MXRAM::PRESENT_INPUT_VOLTAGE, motor_status, "Input Voltage");
   }
 
-  bool dynamixel_rdk_ros2::getCurrentTemperatureSync(uint8_t &temperature)
+  bool dynamixel_rdk_ros2::getCurrentTemperatureSync()
   {
-    return SyncRead(MXRAM::PRESENT_TEMPERATURE, temperature, "Current Temperature");
+    return SyncRead(MXRAM::PRESENT_TEMPERATURE, motor_status, "Current Temperature");
   }
 
-  bool dynamixel_rdk_ros2::getCurrentTorqueSync(uint16_t &torque)
+  bool dynamixel_rdk_ros2::getCurrentTorqueSync()
   {
-    return SyncRead(MXRAM::PRESENT_CURRENT, torque, "Current Torque");
+    return SyncRead(MXRAM::PRESENT_CURRENT, motor_status, "Current Torque");
   }
 
-  bool dynamixel_rdk_ros2::getMovingStatusSync(uint8_t &moving_status)
+  bool dynamixel_rdk_ros2::getMovingStatusSync()
   {
-    return SyncRead(MXRAM::MOVING_STATUS, moving_status, "Moving Status");
+    return SyncRead(MXRAM::MOVING_STATUS, motor_status, "Moving Status");
   }
 
-  bool dynamixel_rdk_ros2::HardwareErrorStatusSync(uint8_t &error_status)
+  bool dynamixel_rdk_ros2::HardwareErrorStatusSync()
   {
-    return SyncRead(MXRAM::HARDWARE_ERROR_STATUS, error_status, "Hardware Error Status");
+    return SyncRead(MXRAM::HARDWARE_ERROR_STATUS, motor_status, "Hardware Error Status");
   }
 
   // -------------------------------------------------------------- Motor Status Setter --------------------------------------------------------------
 
   bool dynamixel_rdk_ros2::setMinPositionLimit()
   {
-    int TOTAL_MOTOR = motor_ids_.size();
-
-    // 5개씩 묶어서 처리
-    for (int i = 0; i < TOTAL_MOTOR; i += 5)
-    {
-      dynamixel::GroupBulkWrite bulkWrite(port_handler_, packet_handler_);
-
-      for (int j = 0; j < 5 && i + j < TOTAL_MOTOR; ++j)
-      {
-        bool dxl_addparam_result = bulkWrite.addParam(
-            motor_ids_[i + j],
-            EEPROM::MIN_POSITION_LIMIT.first,
-            4,
-            &(motors_setting[i + j].min_position_limit));
-
-        if (!dxl_addparam_result)
-        {
-          RCLCPP_ERROR(this->get_logger(),
-                       "Failed to add parameter to bulk write for ID %d",
-                       motor_ids_[i + j]);
-          return false;
-        }
-      }
-
-      int dxl_comm_result = bulkWrite.txPacket();
-      if (dxl_comm_result != COMM_SUCCESS)
-      {
-        RCLCPP_ERROR(this->get_logger(),
-                     "Bulk write failed when setting min position limit: %s",
-                     packet_handler_->getTxRxResult(dxl_comm_result));
-        return false;
-      }
-    }
-
-    return true;
+    return BulkWrite(EEPROM::MIN_POSITION_LIMIT, motor_settings, "min position limit");
   }
 
   bool dynamixel_rdk_ros2::setMaxPositionLimit()
   {
-    int TOTAL_MOTOR = motor_ids_.size();
-
-    // 5개씩 묶어서 처리
-    for (int i = 0; i < TOTAL_MOTOR; i += 5)
-    {
-      dynamixel::GroupBulkWrite bulkWrite(port_handler_, packet_handler_);
-
-      for (int j = 0; j < 5 && i + j < TOTAL_MOTOR; ++j)
-      {
-        bool dxl_addparam_result = bulkWrite.addParam(
-            motor_ids_[i + j],
-            EEPROM::MAX_POSITION_LIMIT.first,
-            4,
-            &(motors_setting[i + j].max_position_limit));
-
-        if (!dxl_addparam_result)
-        {
-          RCLCPP_ERROR(this->get_logger(),
-                       "Failed to add parameter to bulk write for ID %d",
-                       motor_ids_[i + j]);
-          return false;
-        }
-      }
-
-      int dxl_comm_result = bulkWrite.txPacket();
-      if (dxl_comm_result != COMM_SUCCESS)
-      {
-        RCLCPP_ERROR(this->get_logger(),
-                     "Bulk write failed when setting max position limit: %s",
-                     packet_handler_->getTxRxResult(dxl_comm_result));
-        return false;
-      }
-    }
-
-    return true;
+    return BulkWrite(EEPROM::MAX_POSITION_LIMIT, motor_settings, "max position limit");
   }
 
   bool dynamixel_rdk_ros2::setMaxVelocityLimit()
   {
-    int TOTAL_MOTOR = motor_ids_.size();
-
-    // 5개씩 묶어서 처리
-    for (int i = 0; i < TOTAL_MOTOR; i += 5)
-    {
-      dynamixel::GroupBulkWrite bulkWrite(port_handler_, packet_handler_);
-
-      for (int j = 0; j < 5 && i + j < TOTAL_MOTOR; ++j)
-      {
-        bool dxl_addparam_result = bulkWrite.addParam(
-            motor_ids_[i + j],
-            EEPROM::VELOCITY_LIMIT.first,
-            4,
-            &(motors_setting[i + j].max_velocity_limit));
-
-        if (!dxl_addparam_result)
-        {
-          RCLCPP_ERROR(this->get_logger(),
-                       "Failed to add parameter to bulk write for ID %d",
-                       motor_ids_[i + j]);
-          return false;
-        }
-      }
-
-      int dxl_comm_result = bulkWrite.txPacket();
-      if (dxl_comm_result != COMM_SUCCESS)
-      {
-        RCLCPP_ERROR(this->get_logger(),
-                     "Bulk write failed when setting max velocity limit: %s",
-                     packet_handler_->getTxRxResult(dxl_comm_result));
-        return false;
-      }
-    }
-
-    return true;
+    return BulkWrite(EEPROM::VELOCITY_LIMIT, motor_settings, "max velocity limit");
   }
 
   bool dynamixel_rdk_ros2::setMaxAccelerationLimit()
   {
-    int TOTAL_MOTOR = motor_ids_.size();
-
-    // 5개씩 묶어서 처리
-    for (int i = 0; i < TOTAL_MOTOR; i += 5)
-    {
-      dynamixel::GroupBulkWrite bulkWrite(port_handler_, packet_handler_);
-
-      for (int j = 0; j < 5 && i + j < TOTAL_MOTOR; ++j)
-      {
-        bool dxl_addparam_result = bulkWrite.addParam(
-            motor_ids_[i + j],
-            EEPROM::ACCELERATION_LIMIT.first,
-            4,
-            &(motors_setting[i + j].max_acceleration_limit));
-
-        if (!dxl_addparam_result)
-        {
-          RCLCPP_ERROR(this->get_logger(),
-                       "Failed to add parameter to bulk write for ID %d",
-                       motor_ids_[i + j]);
-          return false;
-        }
-      }
-
-      int dxl_comm_result = bulkWrite.txPacket();
-      if (dxl_comm_result != COMM_SUCCESS)
-      {
-        RCLCPP_ERROR(this->get_logger(),
-                     "Bulk write failed when setting max acceleration limit: %s",
-                     packet_handler_->getTxRxResult(dxl_comm_result));
-        return false;
-      }
-    }
-
-    return true;
+    return BulkWrite(EEPROM::ACCELERATION_LIMIT, motor_settings, "max acceleration limit");
   }
 
   bool dynamixel_rdk_ros2::setCurrentLimit()
   {
-    int TOTAL_MOTOR = motor_ids_.size();
-
-    // 5개씩 묶어서 처리
-    for (int i = 0; i < TOTAL_MOTOR; i += 5)
-    {
-      dynamixel::GroupBulkWrite bulkWrite(port_handler_, packet_handler_);
-
-      for (int j = 0; j < 5 && i + j < TOTAL_MOTOR; ++j)
-      {
-        bool dxl_addparam_result = bulkWrite.addParam(
-            motor_ids_[i + j],
-            EEPROM::CURRENT_LIMIT.first,
-            2,
-            &(motors_setting[i + j].current_limit));
-
-        if (!dxl_addparam_result)
-        {
-          RCLCPP_ERROR(this->get_logger(),
-                       "Failed to add parameter to bulk write for ID %d",
-                       motor_ids_[i + j]);
-          return false;
-        }
-      }
-
-      int dxl_comm_result = bulkWrite.txPacket();
-      if (dxl_comm_result != COMM_SUCCESS)
-      {
-        RCLCPP_ERROR(this->get_logger(),
-                     "Bulk write failed when setting current limit: %s",
-                     packet_handler_->getTxRxResult(dxl_comm_result));
-        return false;
-      }
-    }
-
-    return true;
+    return BulkWrite(EEPROM::CURRENT_LIMIT, motor_settings, "current limit");
   }
 
   bool dynamixel_rdk_ros2::setTemperatureLimit()
   {
-    int TOTAL_MOTOR = motor_ids_.size();
-
-    // 5개씩 묶어서 처리
-    for (int i = 0; i < TOTAL_MOTOR; i += 5)
-    {
-      dynamixel::GroupBulkWrite bulkWrite(port_handler_, packet_handler_);
-
-      for (int j = 0; j < 5 && i + j < TOTAL_MOTOR; ++j)
-      {
-        bool dxl_addparam_result = bulkWrite.addParam(
-            motor_ids_[i + j],
-            EEPROM::TEMPERATURE_LIMIT.first,
-            1,
-            &(motors_setting[i + j].temperature_limit));
-
-        if (!dxl_addparam_result)
-        {
-          RCLCPP_ERROR(this->get_logger(),
-                       "Failed to add parameter to bulk write for ID %d",
-                       motor_ids_[i + j]);
-          return false;
-        }
-      }
-
-      int dxl_comm_result = bulkWrite.txPacket();
-      if (dxl_comm_result != COMM_SUCCESS)
-      {
-        RCLCPP_ERROR(this->get_logger(),
-                     "Bulk write failed when setting temperature limit: %s",
-                     packet_handler_->getTxRxResult(dxl_comm_result));
-        return false;
-      }
-    }
-
-    return true;
+    return BulkWrite(EEPROM::TEMPERATURE_LIMIT, motor_settings, "temperature limit");
   }
 
   bool dynamixel_rdk_ros2::setPwmLimit()
   {
-    int TOTAL_MOTOR = motor_ids_.size();
-
-    // 5개씩 묶어서 처리
-    for (int i = 0; i < TOTAL_MOTOR; i += 5)
-    {
-      dynamixel::GroupBulkWrite bulkWrite(port_handler_, packet_handler_);
-
-      for (int j = 0; j < 5 && i + j < TOTAL_MOTOR; ++j)
-      {
-        bool dxl_addparam_result = bulkWrite.addParam(
-            motor_ids_[i + j],
-            EEPROM::PWM_LIMIT.first,
-            2,
-            &(motors_setting[i + j].pwm_limit));
-
-        if (!dxl_addparam_result)
-        {
-          RCLCPP_ERROR(this->get_logger(),
-                       "Failed to add parameter to bulk write for ID %d",
-                       motor_ids_[i + j]);
-          return false;
-        }
-      }
-
-      int dxl_comm_result = bulkWrite.txPacket();
-      if (dxl_comm_result != COMM_SUCCESS)
-      {
-        RCLCPP_ERROR(this->get_logger(),
-                     "Bulk write failed when setting PWM limit: %s",
-                     packet_handler_->getTxRxResult(dxl_comm_result));
-        return false;
-      }
-    }
-
-    return true;
+    return BulkWrite(EEPROM::PWM_LIMIT, motor_settings, "pwm limit");
   }
 
   bool dynamixel_rdk_ros2::setShutdown()
   {
-    int TOTAL_MOTOR = motor_ids_.size();
-
-    // 5개씩 묶어서 처리
-    for (int i = 0; i < TOTAL_MOTOR; i += 5)
-    {
-      dynamixel::GroupBulkWrite bulkWrite(port_handler_, packet_handler_);
-
-      for (int j = 0; j < 5 && i + j < TOTAL_MOTOR; ++j)
-      {
-        bool dxl_addparam_result = bulkWrite.addParam(
-            motor_ids_[i + j],
-            EEPROM::SHUTDOWN.first,
-            1,
-            &(motors_setting[i + j].shutdown));
-
-        if (!dxl_addparam_result)
-        {
-          RCLCPP_ERROR(this->get_logger(),
-                       "Failed to add parameter to bulk write for ID %d",
-                       motor_ids_[i + j]);
-          return false;
-        }
-      }
-
-      int dxl_comm_result = bulkWrite.txPacket();
-      if (dxl_comm_result != COMM_SUCCESS)
-      {
-        RCLCPP_ERROR(this->get_logger(),
-                     "Bulk write failed when setting shutdown: %s",
-                     packet_handler_->getTxRxResult(dxl_comm_result));
-        return false;
-      }
-    }
-
-    return true;
+    return BulkWrite(EEPROM::SHUTDOWN, motor_settings, "shutdown");
   }
 
   // double dynamixel_rdk_ros2::convertPositionToRadian(int position, int min, int max)
@@ -774,7 +475,7 @@ namespace dynamixel_rdk_ros2
     for (auto id : motor_ids_)
     {
       // 토크 해제
-      if (!setTorque(id, false))
+      if (!setTorque(id, TORQUEOFF))
       {
         return false;
       }
@@ -784,84 +485,126 @@ namespace dynamixel_rdk_ros2
     {
     case MIN_POSITION_LIMIT_CASE:
       // 최소 위치 한계 설정 (기본값: 0)
-      for (auto id : motor_ids_)
+      for (int i = 0; i < TOTAL_MOTOR; i++)
       {
-        motors_setting[id].min_position_limit = change_set_value_arr[id];
+        int id = motor_ids_[i];
+        motor_settings[id].min_position_limit = change_set_value_arr[i];
       }
-      setMinPositionLimit();
+      if (!setMinPositionLimit())
+      {
+          return false;
+      }
       break;
 
     case MAX_POSITION_LIMIT_CASE:
       // 최대 위치 한계 설정 (기본값 : 4095)
-      for (auto id : motor_ids_)
+      for (int i = 0; i < TOTAL_MOTOR; i++)
       {
-        motors_setting[id].max_position_limit = change_set_value_arr[id];
+        int id = motor_ids_[i];
+        motor_settings[id].min_position_limit = change_set_value_arr[i];
       }
-      setMaxPositionLimit();
+      if (!setMaxPositionLimit())
+      {
+        return false;
+      }
       break;
 
     case VELOCITY_LIMIT_CASE:
       // 최대 속도 설정 (기본값 : 210)
-      for (auto id : motor_ids_)
+      for (int i = 0; i < TOTAL_MOTOR; i++)
       {
-        motors_setting[id].max_velocity_limit = change_set_value_arr[id];
+        int id = motor_ids_[i];
+        motor_settings[id].max_velocity_limit = change_set_value_arr[i];
       }
-      setMaxVelocityLimit();
+      if (!setMaxVelocityLimit())
+      {
+        return false;
+      }
       break;
 
     case ACCELERATION_LIMIT_CASE:
       // 최대 가속도 설정 (기본값 : 50)
-      for (auto id : motor_ids_)
+      for (int i = 0; i < TOTAL_MOTOR; i++)
       {
-        motors_setting[id].max_acceleration_limit = change_set_value_arr[id];
+        int id = motor_ids_[i];
+        motor_settings[id].max_acceleration_limit = change_set_value_arr[i];
       }
-      setMaxAccelerationLimit();
+      if (!setMaxAccelerationLimit())
+      {
+        return false;
+      }
       break;
 
     case TEMPERATURE_LIMIT_CASE:
       // 온도 제한 설정 (기본값: 80)
-      for (auto id : motor_ids_)
+      for (int i = 0; i < TOTAL_MOTOR; i++)
       {
-        motors_setting[id].temperature_limit = change_set_value_arr[id];
+        int id = motor_ids_[i];
+        motor_settings[id].temperature_limit = change_set_value_arr[i];
       }
-      setTemperatureLimit();
       break;
 
     case CURRENT_LIMIT_CASE:
       // 전류 제한 설정 (기본값: 2047)
-      for (auto id : motor_ids_)
+      for (int i = 0; i < TOTAL_MOTOR; i++)
       {
-        motors_setting[id].current_limit = change_set_value_arr[id];
+        int id = motor_ids_[i];
+        motor_settings[id].current_limit = change_set_value_arr[i];
       }
-      setCurrentLimit();
       break;
 
     case PWM_LIMIT_CASE:
       // PWM 제한 설정 (기본값: 885)
-      for (auto id : motor_ids_)
+      for (int i = 0; i < TOTAL_MOTOR; i++)
       {
-        motors_setting[id].pwm_limit = change_set_value_arr[id];
+        int id = motor_ids_[i];
+        motor_settings[id].pwm_limit = change_set_value_arr[i];
       }
-      setPwmLimit();
+
+      if (!setPwmLimit())
+      {
+        return false;
+      }
+
       break;
 
     case SHUTDOWN_CASE:
       // 셧다운 설정 (기본값: 52)
-      for (auto id : motor_ids_)
+      for (int i = 0; i < TOTAL_MOTOR; i++)
       {
-        motors_setting[id].shutdown = change_set_value_arr[id];
+        int id = motor_ids_[i];
+        motor_settings[id].shutdown = change_set_value_arr[i];
       }
-      setShutdown();
+      if (!setShutdown())
+      {
+        return false;
+      }
       break;
 
     default:
+      // 모든 모터를 기본값으로 설정
+      RCLCPP_INFO(this->get_logger(), "exceeded the size of the mode you can select");
+      RCLCPP_INFO(this->get_logger(), "Setting all motors to default values");
+
+      for (int i = 0; i < TOTAL_MOTOR; i++)
+      {
+        int id = motor_ids_[i];
+        motor_settings[id].min_position_limit = 0;
+        motor_settings[id].max_position_limit = 4095;
+        motor_settings[id].max_velocity_limit = 210;
+        motor_settings[id].max_acceleration_limit = 50;
+        motor_settings[id].temperature_limit = 80;
+        motor_settings[id].current_limit = 2047;
+        motor_settings[id].pwm_limit = 885;
+        motor_settings[id].shutdown = 52;
+      }
       break;
     }
 
     // 토크 설정
     for (auto id : motor_ids_)
     {
-      if (!setTorque(id, true))
+      if (!setTorque(id, TORQUEON))
       {
         return false;
       }
@@ -874,404 +617,41 @@ namespace dynamixel_rdk_ros2
 
   bool dynamixel_rdk_ros2::setGoalPosition(uint8_t id, uint32_t position)
   {
-    dxl_error = 0;
-    dxl_comm_result = COMM_TX_FAIL;
-
-    dxl_comm_result = packet_handler_->write4ByteTxRx(port_handler_, id, MXRAM::GOAL_POSITION.first, position, &dxl_error);
-
-    if (dxl_comm_result != COMM_SUCCESS)
-    {
-      RCLCPP_ERROR(this->get_logger(),
-                   "Failed to set goal position for ID %d: %s",
-                   id, packet_handler_->getTxRxResult(dxl_comm_result));
-      return false;
-    }
-
-    return true;
+    return TxRx(id, MXRAM::GOAL_POSITION, position, "Set Goal Position", WRITE);
   }
 
   bool dynamixel_rdk_ros2::setGoalPositionBulk()
   {
-    int TOTAL_MOTOR = motor_ids_.size();
-    dynamixel::GroupBulkWrite bulkWrite(port_handler_, packet_handler_);
-
-    // 다이나믹셀 모터를 5개씩 묶어서 처리
-    for (int i = 0; i < TOTAL_MOTOR; i += 5)
-    {
-      for (int j = 0; j < 5 && i + j < TOTAL_MOTOR; ++j)
-      {
-        bool dxl_addparam_result = bulkWrite.addParam(motor_ids_[i + j], MXRAM::GOAL_POSITION.first, 4, &(motors[i + j].position));
-        if (!dxl_addparam_result)
-        {
-          RCLCPP_ERROR(this->get_logger(),
-                       "Failed to add parameter to sync write on Dynamixel ID: %d",
-                       motor_ids_[i + j]);
-          return false;
-        }
-      }
-
-      int dxl_comm_result = bulkWrite.txPacket();
-      if (dxl_comm_result != COMM_SUCCESS)
-      {
-        RCLCPP_ERROR(this->get_logger(),
-                     "Failed to sync write goal position: %s",
-                     packet_handler_->getTxRxResult(dxl_comm_result));
-        return false;
-      }
-    }
-
-    return true;
+    return BulkWrite(MXRAM::GOAL_POSITION, motor_settings, "Set Goal Position Bulk");
   }
 
-  bool dynamixel_rdk_ros2::switchTocurrentMode(uint8_t id)
+  bool dynamixel_rdk_ros2::switchTocurrentMode(uint8_t id, uint8_t mode)
   {
-    dxl_error = 0;
-    dxl_comm_result = COMM_TX_FAIL;
-
-    dxl_comm_result = packet_handler_->write1ByteTxRx(
-        port_handler_,
-        id,
-        EEPROM::OPERATING_MODE.first,
-        0, // 0 = Current Control Mode
-        &dxl_error);
-
-    if (dxl_comm_result != COMM_SUCCESS)
-    {
-      RCLCPP_ERROR(this->get_logger(),
-                   "Failed to switch to current mode for ID %d: %s",
-                   id, packet_handler_->getTxRxResult(dxl_comm_result));
-      return false;
-    }
-
-    return true;
+    return TxRx(id, EEPROM::OPERATING_MODE, mode, "Switch to Current Mode", WRITE);
   }
 
   bool dynamixel_rdk_ros2::setGoalCurrent(uint8_t id, uint16_t current)
   {
-    dxl_error = 0;
-    dxl_comm_result = COMM_TX_FAIL;
-
-    dxl_comm_result = packet_handler_->write2ByteTxRx(
-        port_handler_,
-        id,
-        MXRAM::GOAL_CURRENT.first,
-        current,
-        &dxl_error);
-
-    if (dxl_comm_result != COMM_SUCCESS)
-    {
-      RCLCPP_ERROR(this->get_logger(),
-                   "Failed to set goal current for ID %d: %s",
-                   id, packet_handler_->getTxRxResult(dxl_comm_result));
-      return false;
-    }
-
-    return true;
-  }
-
-  // -------------------------------------------------------------- Timer Callback --------------------------------------------------------------
-  // getting and publishing motor status
-  void dynamixel_rdk_ros2::timer_callback()
-  {
-    motorCheck(); // 연결 상태 갱신 및 메세지 관리 (WarningStatus)
-
-    dynamixel_sdk_custom_interfaces::msg::CurrentMotorStatus msg;
-
-    size_t TOTAL_CONNECT_MOTORS = connected_motor_ids_.size();
-    uint32_t position = 0;
-    uint32_t goal_position = 0;
-    uint8_t velocity = 0;
-    uint16_t voltage = 0;
-    uint8_t temperature = 0;
-    uint16_t torque = 0;
-    uint8_t moving_status = 0;
-    uint8_t error_status = 0;
-
-    msg.position.resize(TOTAL_CONNECT_MOTORS);
-    msg.velocity.resize(TOTAL_CONNECT_MOTORS);
-    msg.temperature.resize(TOTAL_CONNECT_MOTORS);
-    msg.torque.resize(TOTAL_CONNECT_MOTORS);
-    msg.input_voltage.resize(TOTAL_CONNECT_MOTORS);
-    msg.moving_status.resize(TOTAL_CONNECT_MOTORS);
-    msg.error_status.resize(TOTAL_CONNECT_MOTORS);
-
-    // 현재 모터 상태를 sync로 동시에 가져오지 못할 경우, 개별 모터에 대해 순차적으로 모터 상태를 가져옴
-    if (!(getCurrentPositionSync(position) &&
-          getGoalPositionSync(goal_position) &&
-          getCurrentVelocitySync(velocity) &&
-          getInputVoltageSync(voltage) &&
-          getCurrentTemperatureSync(temperature) &&
-          getCurrentTorqueSync(torque) &&
-          getMovingStatusSync(moving_status) &&
-          HardwareErrorStatusSync(error_status)))
-    {
-      // 연결된 모터만 상태 받아오기
-      for (size_t i = 0; i < TOTAL_CONNECT_MOTORS; ++i)
-      {
-        uint8_t connect_id = connected_motor_ids_[i];
-
-        RCLCPP_INFO(this->get_logger(), "\n\n현재 처리 중인 ID: %d", connect_id);
-
-        getCurrentPosition(connect_id, position);
-        getGoalPosition(connect_id, goal_position);
-        getCurrentVelocity(connect_id, velocity);
-        getInputVoltage(connect_id, voltage);
-        getCurrentTemperature(connect_id, temperature);
-        getCurrentTorque(connect_id, torque);
-        getMovingStatus(connect_id, moving_status);
-        HardwareErrorStatus(connect_id, error_status);
-
-        msg.position[i] = position;
-        msg.velocity[i] = velocity;
-        msg.temperature[i] = temperature;
-        msg.torque[i] = torque;
-        msg.input_voltage[i] = voltage;
-        msg.moving_status[i] = moving_status;
-        msg.error_status[i] = error_status;
-      }
-    }
-    RCLCPP_INFO(this->get_logger(), "모터 총 개수 : %zu", motor_ids_.size());
-    RCLCPP_INFO(this->get_logger(), "모터 상태 퍼블리시");
-    RCLCPP_INFO(this->get_logger(), "총 연결된 모터 개수 : %ld", TOTAL_CONNECT_MOTORS);
-
-    // 퍼블리시
-    motor_status_pubisher_->publish(msg);
-  }
-
-  // -------------------------------------------------------------- Utility --------------------------------------------------------------
-
-  bool dynamixel_rdk_ros2::errorInterface(uint8_t id)
-  {
-    uint8_t temperature = 0;
-    uint16_t torque = 0;
-    uint32_t position = 0;
-    uint16_t voltage = 0;
-    uint8_t error_status = 0;
-    uint8_t moving_status = 0;
-    uint32_t goal_position = 0;
-
-    HardwareErrorStatus(id, error_status);
-
-    if (error_status & 0b00000001) // 비트 0: 입력 전압 오류
-    {
-      RCLCPP_ERROR(this->get_logger(), "ID %d: Input voltage error detected!", id);
-    }
-
-    if (error_status & 0b00000100) // 비트 2: 과열 오류
-    {
-      RCLCPP_ERROR(this->get_logger(), "ID %d: Overheating error detected!", id);
-    }
-
-    if (error_status & 0b00001000) // 비트 3: 엔코더 오류
-    {
-      RCLCPP_ERROR(this->get_logger(), "ID %d: Encoder error detected!", id);
-      RCLCPP_ERROR(this->get_logger(), "ID %d: Please check the cable connection", id);
-    }
-
-    if (error_status & 0b00010000) // 비트 4: 전기적 충격 오류
-    {
-      RCLCPP_ERROR(this->get_logger(), "ID %d: Electrical shock error detected!", id);
-    }
-
-    if (error_status & 0b00100000) // 비트 5: 과부하 오류
-    {
-      RCLCPP_ERROR(this->get_logger(), "ID %d: Overload error detected!", id);
-    }
-    return true;
-  }
-
-  template <typename T>
-  bool dynamixel_rdk_ros2::TxRx(uint8_t id, const std::pair<int, int> &control_table_adress, T &value, const std::string &status_name)
-  { // mode: 0 - Read, 1 - Write
-
-    uint8_t dxl_error = 0;
-    int dxl_comm_result = COMM_TX_FAIL;
-
-    // // Read - 모터에서 읽은 raw 바이트 데이터를 채워넣을 포인터 주소를 전달해야 하므로 reinterpret_cast
-    // if (mode == 0)
-    // {
-    if constexpr (sizeof(T) == 1)
-    {
-      dxl_comm_result = packet_handler_->read1ByteTxRx(port_handler_, id, control_table_adress.first, reinterpret_cast<uint8_t *>(&value), &dxl_error);
-    }
-    else if constexpr (sizeof(T) == 2)
-    {
-      dxl_comm_result = packet_handler_->read2ByteTxRx(port_handler_, id, control_table_adress.first, reinterpret_cast<uint16_t *>(&value), &dxl_error);
-    }
-    else if constexpr (sizeof(T) == 4)
-    {
-      dxl_comm_result = packet_handler_->read4ByteTxRx(port_handler_, id, control_table_adress.first, reinterpret_cast<uint32_t *>(&value), &dxl_error);
-    }
-    else
-    {
-      RCLCPP_ERROR(this->get_logger(), "Unsupported data size for %s", status_name.c_str());
-      return false;
-    }
-
-    if (dxl_comm_result != COMM_SUCCESS)
-    {
-      RCLCPP_ERROR(this->get_logger(),
-                    "Failed to get %s for ID %d: %s",
-                    status_name.c_str(), id, packet_handler_->getTxRxResult(dxl_comm_result));
-      return false;
-    }
-
-    if (dxl_error != 0)
-    {
-      RCLCPP_ERROR(this->get_logger(),
-                    "Dynamixel error while reading %s for ID %d: %s",
-                    status_name.c_str(), id, packet_handler_->getRxPacketError(dxl_error));
-      return false;
-    }
-
-    RCLCPP_INFO(this->get_logger(), "ID %d %s: %d", id, status_name.c_str(), static_cast<int>(value));
-    return true;
-    // }
-
-    // // value의 실제 값을 보내야 하므로 static_cast
-    // if (mode == 1)
-    // {
-    //   if constexpr (sizeof(T) == 1)
-    //   {
-    //     dxl_comm_result = packet_handler_->write1ByteTxRx(port_handler_, id, control_table_adress.first, static_cast<uint8_t>(value), &dxl_error);
-    //   }
-    //   else if constexpr (sizeof(T) == 2)
-    //   {
-    //     dxl_comm_result = packet_handler_->write2ByteTxRx(port_handler_, id, control_table_adress.first, static_cast<uint16_t>(value), &dxl_error);
-    //   }
-    //   else if constexpr (sizeof(T) == 4)
-    //   {
-    //     dxl_comm_result = packet_handler_->write4ByteTxRx(port_handler_, id, control_table_adress.first, static_cast<uint32_t>(value), &dxl_error);
-    //   }
-    //   else
-    //   {
-    //     RCLCPP_ERROR(this->get_logger(), "Unsupported data size for %s", status_name.c_str());
-    //     return false;
-    //   }
-
-    //   if (dxl_comm_result != COMM_SUCCESS)
-    //   {
-    //     RCLCPP_ERROR(this->get_logger(),
-    //                  "Failed to write %s for ID %d: %s",
-    //                  status_name.c_str(), id, packet_handler_->getTxRxResult(dxl_comm_result));
-    //     return false;
-    //   }
-
-    //   if (dxl_error != 0)
-    //   {
-    //     RCLCPP_ERROR(this->get_logger(),
-    //                  "Dynamixel error while writing %s for ID %d: %s",
-    //                  status_name.c_str(), id, packet_handler_->getRxPacketError(dxl_error));
-    //     return false;
-    //   }
-
-    //   return true;
-    // }
-  }
-
-  template <typename D>
-  bool dynamixel_rdk_ros2::SyncRead(const std::pair<int, int> &control_table_adress, D &status_save, const std::string &status_name, int batch_size)
-  {
-    int TOTAL_MOTOR = motor_ids_.size();
-    dynamixel_sdk_custom_interfaces::msg::CurrentMotorStatus msg;
-
-    for (int i = 0; i < TOTAL_MOTOR; i += batch_size)
-    {
-      dynamixel::GroupSyncRead syncRead(port_handler_, packet_handler_, control_table_adress.first, control_table_adress.second);
-
-      for (int j = 0; j < batch_size && i + j < TOTAL_MOTOR; ++j)
-      {
-        bool dxl_addparam_result = syncRead.addParam(motor_ids_[i + j]);
-
-        if (!dxl_addparam_result)
-        {
-          RCLCPP_ERROR(this->get_logger(),
-                       "Failed to add parameter to sync read for %s, ID %d",
-                       status_name.c_str(), motor_ids_[i + j]);
-          return false;
-        }
-      }
-
-      int dxl_comm_result = syncRead.txRxPacket();
-      if (dxl_comm_result != COMM_SUCCESS)
-      {
-        RCLCPP_ERROR(this->get_logger(), "Sync read failed when getting %s",
-                     status_name.c_str());
-        return false;
-      }
-
-      for (int j = 0; j < batch_size && i + j < TOTAL_MOTOR; ++j)
-      {
-        if (syncRead.isAvailable(motor_ids_[i + j], control_table_adress.first, control_table_adress.second))
-        {
-          status_save = syncRead.getData(motor_ids_[i + j], control_table_adress.first, control_table_adress.second);
-
-          if (status_name == "Current Position")
-          {
-            msg.position[i + j] = status_save;
-          }
-          else if (status_name == "Current Velocity")
-          {
-            msg.velocity[i + j] = status_save;
-          }
-          else if (status_name == "Input Voltage")
-          {
-            msg.input_voltage[i + j] = status_save;
-          }
-          else if (status_name == "Current Temperature")
-          {
-            msg.temperature[i + j] = status_save;
-          }
-          else if (status_name == "Current Torque")
-          {
-            msg.torque[i + j] = status_save;
-          }
-          else if (status_name == "Moving Status")
-          {
-            msg.moving_status[i + j] = status_save;
-          }
-        }
-
-        else
-        {
-          RCLCPP_ERROR(this->get_logger(),
-                       "Failed to get %s for ID %d",
-                       status_name.c_str(), motor_ids_[i + j]);
-          return false;
-        }
-      }
-    }
-
-    return true;
+    return TxRx(id, MXRAM::GOAL_CURRENT, current, "Set Goal Current", WRITE);
   }
 
   bool dynamixel_rdk_ros2::sendMotorPacket(std::vector<double> position, std::vector<double> velocity, std::vector<double> acceleration)
   {
     dynamixel::GroupSyncWrite SyncWrite(port_handler_, packet_handler_, MXRAM::PROFILE_ACCELERATION.first, 12);
 
-    for (size_t i = 0; i < motor_ids_.size(); i++)
+    std::vector<uint8_t> control_data_vector;
+
+    for (int i = 0; i < TOTAL_MOTOR; i++)
     {
-      uint32_t goal_position = posToRadian(position[i]);
+      uint32_t goal_position = radianToTick(position[i]);
       uint32_t goal_velocity = velToRadian(velocity[i]);
       uint32_t goal_acceleration = accToRadian(acceleration[i]);
 
-      uint8_t data[12];
-      data[0] = DXL_LOBYTE(DXL_LOWORD(goal_acceleration));
-      data[1] = DXL_HIBYTE(DXL_LOWORD(goal_acceleration));
-      data[2] = DXL_LOBYTE(DXL_HIWORD(goal_acceleration));
-      data[3] = DXL_HIBYTE(DXL_HIWORD(goal_acceleration));
+      divide_byte(control_data_vector, goal_acceleration, 4);
+      divide_byte(control_data_vector, goal_velocity, 4);
+      divide_byte(control_data_vector, goal_position, 4);
 
-      data[4] = DXL_LOBYTE(DXL_LOWORD(goal_velocity));
-      data[5] = DXL_HIBYTE(DXL_LOWORD(goal_velocity));
-      data[6] = DXL_LOBYTE(DXL_HIWORD(goal_velocity));
-      data[7] = DXL_HIBYTE(DXL_HIWORD(goal_velocity));
-
-      data[8] = DXL_LOBYTE(DXL_LOWORD(goal_position));
-      data[9] = DXL_HIBYTE(DXL_LOWORD(goal_position));
-      data[10] = DXL_LOBYTE(DXL_HIWORD(goal_position));
-      data[11] = DXL_HIBYTE(DXL_HIWORD(goal_position));
-
-      if (!SyncWrite.addParam(motor_ids_[i], data))
+      if (!SyncWrite.addParam(motor_ids_[i], control_data_vector.data()))
       {
         RCLCPP_ERROR(this->get_logger(), "Failed to add parameter for ID %d", motor_ids_[i]);
         return false;
@@ -1289,24 +669,341 @@ namespace dynamixel_rdk_ros2
     return true;
   }
 
-  // void dynamixel_rdk_ros2::dynamixel_control_callback(const dynamixel_sdk_custom_interfaces::msg::DynamixelControlMsgs &msg)
-  // {
-  //   std::vector<double> goal_positions;
-  //   std::vector<double> goal_velocities;
-  //   std::vector<double> goal_accelerations;
+  // -------------------------------------------------------------- Timer Callback --------------------------------------------------------------
+  // getting and publishing motor status
+  void dynamixel_rdk_ros2::timer_callback()
+  {
+    motorCheck(); // 연결 상태 확인
 
-  //   for (auto &motor_control : msg.motor_control)
-  //   {
-  //     goal_positions.push_back(motor_control.goal_position);
-  //     goal_velocities.push_back(motor_control.profile_velocity);
-  //     goal_accelerations.push_back(motor_control.profile_acceleration);
-  //   }
+    dynamixel_sdk_custom_interfaces::msg::CurrentMotorStatus msg;
+    const size_t TOTAL_CONNECT_MOTORS = connected_motor_ids_.size();
 
-  //   sendMotorPacket(goal_positions, goal_velocities, goal_accelerations);
-  // }
+    ResizeMsg(msg, TOTAL_CONNECT_MOTORS);
 
+    bool sync_success =
+        getCurrentPositionSync() &&
+        getGoalPositionSync() &&
+        getCurrentVelocitySync() &&
+        getInputVoltageSync() &&
+        getCurrentTemperatureSync() &&
+        getCurrentTorqueSync() &&
+        getMovingStatusSync() &&
+        HardwareErrorStatusSync();
+
+    if (!sync_success)
+    {
+      RCLCPP_WARN(this->get_logger(), "Sync status read failed, switching to individual motor status read");
+
+      for (size_t index = 0; index < TOTAL_CONNECT_MOTORS; index++)
+      {
+        uint8_t id = connected_motor_ids_[index];
+
+        if (!getCurrentPosition(id, motor_status[TOTAL_MOTOR+1].position)) RCLCPP_ERROR(this->get_logger(), "[ID:%d] Failed to get Current Position", id);
+        else if (!getGoalPosition(id, motor_status[TOTAL_MOTOR+1].goal_position)) RCLCPP_ERROR(this->get_logger(), "[ID:%d] Failed to get Goal Position", id);
+        else if (!getCurrentVelocity(id, motor_status[TOTAL_MOTOR+1].velocity)) RCLCPP_ERROR(this->get_logger(), "[ID:%d] Failed to get Current Velocity", id);
+        else if (!getInputVoltage(id, motor_status[TOTAL_MOTOR+1].voltage)) RCLCPP_ERROR(this->get_logger(), "[ID:%d] Failed to get Input Voltage", id);
+        else if (!getCurrentTemperature(id, motor_status[TOTAL_MOTOR+1].temperature)) RCLCPP_ERROR(this->get_logger(), "[ID:%d] Failed to get Current Temperature", id);
+        else if (!getCurrentTorque(id, motor_status[TOTAL_MOTOR+1].torque)) RCLCPP_ERROR(this->get_logger(), "[ID:%d] Failed to get Current Torque", id);
+        else if (!getMovingStatus(id, motor_status[TOTAL_MOTOR+1].moving_status)) RCLCPP_ERROR(this->get_logger(), "[ID:%d] Failed to get Moving Status", id);
+        else if (!HardwareErrorStatus(id, motor_status[TOTAL_MOTOR+1].error_status)) RCLCPP_ERROR(this->get_logger(), "[ID:%d] Failed to get Hardware Error Status", id);
+
+        msgUpdate(msg, index, motor_status[TOTAL_MOTOR+1].position, motor_status[TOTAL_MOTOR+1].velocity, motor_status[TOTAL_MOTOR+1].voltage, motor_status[TOTAL_MOTOR+1].temperature, motor_status[TOTAL_MOTOR+1].torque, motor_status[TOTAL_MOTOR+1].moving_status, motor_status[TOTAL_MOTOR+1].error_status);
+      }
+    }
+
+    RCLCPP_INFO(this->get_logger(), "모터 총 개수 : %zu", motor_ids_.size());
+    RCLCPP_INFO(this->get_logger(), "총 연결된 모터 개수 : %zu", TOTAL_CONNECT_MOTORS);
+
+    motor_status_pubisher_->publish(msg);
+  }
+
+  void dynamixel_rdk_ros2::dynamixel_control_callback(const dynamixel_sdk_custom_interfaces::msg::DynamixelControlMsgs &msg)
+  {
+    std::vector<double> goal_positions;
+    std::vector<double> goal_velocities;
+    std::vector<double> goal_accelerations;
+
+    for (auto &motor_control : msg.motor_control)
+    {
+      goal_positions.push_back(motor_control.goal_position);
+      goal_velocities.push_back(motor_control.profile_velocity);
+      goal_accelerations.push_back(motor_control.profile_acceleration);
+    }
+
+    sendMotorPacket(goal_positions, goal_velocities, goal_accelerations);
+  }
+
+  // -------------------------------------------------------------- Utility --------------------------------------------------------------
+
+  bool dynamixel_rdk_ros2::errorInterface(uint8_t id)
+  {
+    HardwareErrorStatus(id, motor_status[TOTAL_MOTOR+1].error_status);
+
+    if (motor_status[TOTAL_MOTOR+1].error_status & 0b00000001) // 비트 0: 입력 전압 오류
+    {
+      RCLCPP_ERROR(this->get_logger(), "ID %d: Input voltage error detected!", id);
+    }
+
+    if (motor_status[TOTAL_MOTOR+1].error_status & 0b00000100) // 비트 2: 과열 오류
+    {
+      RCLCPP_ERROR(this->get_logger(), "ID %d: Overheating error detected!", id);
+    }
+
+    if (motor_status[TOTAL_MOTOR+1].error_status & 0b00001000) // 비트 3: 엔코더 오류
+    {
+      RCLCPP_ERROR(this->get_logger(), "ID %d: Encoder error detected!", id);
+      RCLCPP_ERROR(this->get_logger(), "ID %d: Please check the cable connection", id);
+    }
+
+    if (motor_status[TOTAL_MOTOR+1].error_status & 0b00010000) // 비트 4: 전기적 충격 오류
+    {
+      RCLCPP_ERROR(this->get_logger(), "ID %d: Electrical shock error detected!", id);
+    }
+
+    if (motor_status[TOTAL_MOTOR+1].error_status & 0b00100000) // 비트 5: 과부하 오류
+    {
+      RCLCPP_ERROR(this->get_logger(), "ID %d: Overload error detected!", id);
+    }
+    return true;
+  }
+
+  void dynamixel_rdk_ros2::dxl_variable_init()
+  {
+    dxl_error = 0;
+    dxl_comm_result = COMM_TX_FAIL;
+  }
+
+  void dynamixel_rdk_ros2::ResizeMsg(dynamixel_sdk_custom_interfaces::msg::CurrentMotorStatus &msg, size_t size)
+  {
+    msg.position.resize(size);
+    msg.velocity.resize(size);
+    msg.input_voltage.resize(size);
+    msg.temperature.resize(size);
+    msg.torque.resize(size);
+    msg.moving_status.resize(size);
+    msg.error_status.resize(size);
+  }
+
+  void dynamixel_rdk_ros2::msgUpdate(dynamixel_sdk_custom_interfaces::msg::CurrentMotorStatus &msg,
+                                     size_t index,
+                                     uint32_t position, uint8_t velocity, uint16_t voltage,
+                                     uint8_t temperature, uint16_t torque, uint8_t moving_status, uint8_t error_status)
+  {
+    msg.position[index] = position;
+    msg.velocity[index] = velocity;
+    msg.input_voltage[index] = voltage;
+    msg.temperature[index] = temperature;
+    msg.torque[index] = torque;
+    msg.moving_status[index] = moving_status;
+    msg.error_status[index] = error_status;
+  }
+
+
+  void dynamixel_rdk_ros2::divide_byte(std::vector<uint8_t> &data, int address, int byte_size)
+  {
+    switch (byte_size)
+    {
+    case 1:
+      data.push_back(address & 0xFF);
+      break;
+    case 2:
+      data.push_back(DXL_LOBYTE(address));
+      data.push_back(DXL_HIBYTE(address));
+      break;
+    case 4:
+      data.push_back(DXL_LOBYTE(DXL_LOWORD(address)));
+      data.push_back(DXL_HIBYTE(DXL_LOWORD(address)));
+      data.push_back(DXL_LOBYTE(DXL_HIWORD(address)));
+      data.push_back(DXL_HIBYTE(DXL_HIWORD(address)));
+      break;
+    }
+  }
+
+  template <typename T>
+  bool dynamixel_rdk_ros2::TxRx(uint8_t id, const std::pair<int, int> &control_table_adress, T &value, const std::string &status_name, int mode)
+  { // mode: 0 - Read, 1 - Write
+    dxl_variable_init();
+
+    // Read - 모터에서 읽은 raw 바이트 데이터를 채워넣을 포인터 주소를 전달해야 하므로 reinterpret_cast
+    if (mode == READ)
+    {
+      if constexpr (sizeof(T) == 1)
+      {
+        dxl_comm_result = packet_handler_->read1ByteTxRx(port_handler_, id, control_table_adress.first, reinterpret_cast<uint8_t *>(&value), &dxl_error);
+      }
+      else if constexpr (sizeof(T) == 2)
+      {
+        dxl_comm_result = packet_handler_->read2ByteTxRx(port_handler_, id, control_table_adress.first, reinterpret_cast<uint16_t *>(&value), &dxl_error);
+      }
+      else if constexpr (sizeof(T) == 4)
+      {
+        dxl_comm_result = packet_handler_->read4ByteTxRx(port_handler_, id, control_table_adress.first, reinterpret_cast<uint32_t *>(&value), &dxl_error);
+      }
+      else
+      {
+        RCLCPP_ERROR(this->get_logger(), "Unsupported data size for %s", status_name.c_str());
+        return false;
+      }
+
+      if (dxl_comm_result != COMM_SUCCESS)
+      {
+        RCLCPP_ERROR(this->get_logger(),
+                     "Failed to get %s for ID %d: %s",
+                     status_name.c_str(), id, packet_handler_->getTxRxResult(dxl_comm_result));
+        return false;
+      }
+
+      if (dxl_error != 0)
+      {
+        RCLCPP_ERROR(this->get_logger(),
+                     "Dynamixel error while reading %s for ID %d: %s",
+                     status_name.c_str(), id, packet_handler_->getRxPacketError(dxl_error));
+        return false;
+      }
+
+      RCLCPP_INFO(this->get_logger(), "ID %d %s: %d", id, status_name.c_str(), static_cast<int>(value));
+      return true;
+    }
+
+    // value의 실제 값을 보내야 하므로 static_cast
+    if (mode == WRITE)
+    {
+      if constexpr (sizeof(T) == 1)
+      {
+        dxl_comm_result = packet_handler_->write1ByteTxRx(port_handler_, id, control_table_adress.first, static_cast<uint8_t>(value), &dxl_error);
+      }
+      else if constexpr (sizeof(T) == 2)
+      {
+        dxl_comm_result = packet_handler_->write2ByteTxRx(port_handler_, id, control_table_adress.first, static_cast<uint16_t>(value), &dxl_error);
+      }
+      else if constexpr (sizeof(T) == 4)
+      {
+        dxl_comm_result = packet_handler_->write4ByteTxRx(port_handler_, id, control_table_adress.first, static_cast<uint32_t>(value), &dxl_error);
+      }
+      else
+      {
+        RCLCPP_ERROR(this->get_logger(), "Unsupported data size for %s", status_name.c_str());
+        return false;
+      }
+
+      if (dxl_comm_result != COMM_SUCCESS)
+      {
+        RCLCPP_ERROR(this->get_logger(),
+                     "Failed to write %s for ID %d: %s",
+                     status_name.c_str(), id, packet_handler_->getTxRxResult(dxl_comm_result));
+        return false;
+      }
+
+      if (dxl_error != 0)
+      {
+        RCLCPP_ERROR(this->get_logger(),
+                     "Dynamixel error while writing %s for ID %d: %s",
+                     status_name.c_str(), id, packet_handler_->getRxPacketError(dxl_error));
+        return false;
+      }
+
+      return true;
+    }
+
+    RCLCPP_ERROR(this->get_logger(), "Unknown mode value: %d (READ = %d, WRITE = %d)", mode, READ, WRITE);
+    return false;
+  }
+
+bool dynamixel_rdk_ros2::SyncRead(const std::pair<int, int> &control_table_address, std::vector<MotorStatus> &status_values, const std::string &status_name)
+{
+  dynamixel::GroupSyncRead syncRead(port_handler_, packet_handler_, control_table_address.first, control_table_address.second);
+
+  for (int i = 0; i < TOTAL_MOTOR; i++)
+  {
+    bool dxl_addparam_result = syncRead.addParam(motor_ids_[i]);
+
+    if (!dxl_addparam_result)
+    {
+      RCLCPP_ERROR(this->get_logger(),
+                   "Failed to add parameter to SyncRead for %s, ID %d",
+                   status_name.c_str(), motor_ids_[i]);
+      return false;
+    }
+  }
+
+  int dxl_comm_result = syncRead.txRxPacket();
+  if (dxl_comm_result != COMM_SUCCESS)
+  {
+    RCLCPP_ERROR(this->get_logger(), "SyncRead failed when getting %s: %s",
+                 status_name.c_str(), packet_handler_->getTxRxResult(dxl_comm_result));
+    return false;
+  }
+
+  for (int i = 0; i < TOTAL_MOTOR; i++)
+  {
+    if (syncRead.isAvailable(motor_ids_[i], control_table_address.first, control_table_address.second))
+    {
+      if(status_name == "Current Position") status_values[i].position = syncRead.getData(motor_ids_[i], control_table_address.first, control_table_address.second);
+      else if(status_name == "Goal Position") status_values[i].goal_position = syncRead.getData(motor_ids_[i], control_table_address.first, control_table_address.second);
+      else if(status_name == "Current Velocity") status_values[i].velocity = syncRead.getData(motor_ids_[i], control_table_address.first, control_table_address.second);
+      else if(status_name == "Input Voltage") status_values[i].voltage = syncRead.getData(motor_ids_[i], control_table_address.first, control_table_address.second);
+      else if(status_name == "Current Temperature") status_values[i].temperature = syncRead.getData(motor_ids_[i], control_table_address.first, control_table_address.second);
+      else if(status_name == "Current Torque") status_values[i].torque = syncRead.getData(motor_ids_[i], control_table_address.first, control_table_address.second);
+      else if(status_name == "Moving Status") status_values[i].moving_status = syncRead.getData(motor_ids_[i], control_table_address.first, control_table_address.second);
+      else if(status_name == "Hardware Error Status") status_values[i].error_status = syncRead.getData(motor_ids_[i], control_table_address.first, control_table_address.second);
+    }
+    else
+    {
+      RCLCPP_ERROR(this->get_logger(),
+                   "Failed to get %s for ID %d",
+                   status_name.c_str(), motor_ids_[i]);
+      return false;
+    }
+  }
+
+  return true;
 }
 
+bool dynamixel_rdk_ros2::BulkWrite(const std::pair<int, int> &control_table_address, const std::vector<MotorSettings> &values, const std::string &status_name)
+{
+  dynamixel::GroupBulkWrite bulkWrite(port_handler_, packet_handler_);
+
+  for (int i = 0; i < TOTAL_MOTOR; i++)
+  {
+    std::vector<uint8_t> control_data;
+
+    if(status_name == "min position limit") divide_byte(control_data, values[i].min_position_limit, control_table_address.second);
+    else if(status_name == "max position limit") divide_byte(control_data, values[i].max_position_limit, control_table_address.second);
+    else if(status_name == "max velocity limit") divide_byte(control_data, values[i].max_velocity_limit, control_table_address.second);
+    else if(status_name == "max acceleration limit") divide_byte(control_data, values[i].max_acceleration_limit, control_table_address.second);
+    else if(status_name == "current limit") divide_byte(control_data, values[i].current_limit, control_table_address.second);
+    else if(status_name == "temperature limit") divide_byte(control_data, values[i].temperature_limit, control_table_address.second);
+    else if(status_name == "pwm limit") divide_byte(control_data, values[i].pwm_limit, control_table_address.second);
+    else if(status_name == "shutdown") divide_byte(control_data, values[i].shutdown, control_table_address.second);
+
+    else
+    {
+      RCLCPP_ERROR(this->get_logger(), "Unknown status name: %s", status_name.c_str());
+      return false;
+    }
+
+    if (!bulkWrite.addParam(motor_ids_[i], control_table_address.first, control_table_address.second, control_data.data()))
+    {
+      RCLCPP_ERROR(this->get_logger(),
+                   "Failed to add parameter to bulk write for %s, ID %d",
+                   status_name.c_str(), motor_ids_[i]);
+      return false;
+    }
+  }
+
+  int dxl_comm_result = bulkWrite.txPacket();
+  if (dxl_comm_result != COMM_SUCCESS)
+  {
+    RCLCPP_ERROR(this->get_logger(), "Bulk write failed when setting %s: %s",
+                 status_name.c_str(), packet_handler_->getTxRxResult(dxl_comm_result));
+    return false;
+  }
+
+  return true;
+}
+
+
+}
 int main(int argc, char *argv[])
 {
   rclcpp::init(argc, argv);
