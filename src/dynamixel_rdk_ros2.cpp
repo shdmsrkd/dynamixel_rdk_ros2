@@ -19,14 +19,10 @@ namespace dynamixel_rdk_ros2
     // Dynamixel 초기화
     initDynamixel();
 
-    // 모터 기본값 설정
-    int8_t exarray[256] = {0, };
-    DefaultSettingChange(-1, exarray);
-
     dxl_current_ratio = MX_CURRENT_PROFILE;
     dxl_rps_ratio = MX_RPS_PROFILE * M_PI / 30;
     dxl_acc_ratio = MX_ACC_PROFILE * M_PI / 1800;
-    std::vector<MotorStatus> motor_status(TOTAL_MOTOR + 1);
+    std::vector<MotorStatus> motor_status(TOTAL_MOTOR + 2);
 
     // 타이머
     getting_timer_ = this->create_wall_timer(std::chrono::milliseconds(10), std::bind(&dynamixel_rdk_ros2::timer_callback, this));
@@ -53,18 +49,18 @@ namespace dynamixel_rdk_ros2
     this->declare_parameter("baud_rate", 1000000);
     this->declare_parameter("protocol_version", 2.0);
     this->declare_parameter("ids", std::vector<int64_t>{-100, -100, -100, -100, -100, -100, -100, -100, -100, -100});
-    // this->declare_parameter("dynamixels.max_position_limits", std::vector<double>{M_PI});
-    // this->declare_parameter("dynamixels.min_position_limits", std::vector<double>{-M_PI});
-    // this->declare_parameter("dynamixels.max_velocity_limits", std::vector<int64_t>{1});
-    // this->declare_parameter("dynamixels.temperature_limits", std::vector<int64_t>{-1});
+    this->declare_parameter("dynamixels.max_position_limits", std::vector<double>{M_PI});
+    this->declare_parameter("dynamixels.min_position_limits", std::vector<double>{-M_PI});
+    // this->declare_parameter("dynamixels.max_velocity_limits", std::vector<int64_t>{210});
+    // this->declare_parameter("dynamixels.temperature_limits", std::vector<int64_t>{80});
 
     // 파라미터 가져오기
     device_port_ = this->get_parameter("device_port").as_string();
     baud_rate_ = this->get_parameter("baud_rate").as_int();
     protocol_version_ = this->get_parameter("protocol_version").as_double();
     std::vector<int64_t> ids = this->get_parameter("ids").as_integer_array();
-    // max_position_limits_ = get_parameter("dynamixels.max_position_limits").as_double_array();
-    // min_position_limits_ = get_parameter("dynamixels.min_position_limits").as_double_array();
+    std::vector<double> max_position_limits_ = get_parameter("dynamixels.max_position_limits").as_double_array();
+    std::vector<double> min_position_limits_ = get_parameter("dynamixels.min_position_limits").as_double_array();
     // std::vector<int64_t> max_velocity_limits = get_parameter("dynamixels.max_velocity_limits").as_integer_array();
     // std::vector<int64_t> temperature_limits = get_parameter("dynamixels.temperature_limits").as_integer_array();
 
@@ -74,6 +70,13 @@ namespace dynamixel_rdk_ros2
     }
 
     TOTAL_MOTOR = motor_ids_.size();
+
+    // 모터 기본값 설정
+    DefaultSettingChange(MAX_POSITION_LIMIT_CASE, max_position_limits_);
+    DefaultSettingChange(MIN_POSITION_LIMIT_CASE, min_position_limits_);
+    // DefaultSettingChange(VELOCITY_LIMIT_CASE, max_velocity_limits);
+    // DefaultSettingChange(TEMPERATURE_LIMIT_CASE, temperature_limits);
+
 
     // 파라미터 출력
     RCLCPP_INFO(this->get_logger(), "Device port: %s", device_port_.c_str());
@@ -186,145 +189,6 @@ namespace dynamixel_rdk_ros2
   bool dynamixel_rdk_ros2::setOperatingMode(uint8_t id, uint8_t mode)
   {
     return TxRx(id, EEPROM::OPERATING_MODE, mode, "Operating Mode", WRITE);
-  }
-
-  // change_set_mode : 0 - Operating Mode, 1 - Min Position Limit, 2 - Max Position Limit, 3 - Max Velocity Limit, 4 - Acceleration Limit, 5 - Temperature Limit, 6 - Current Limit, 7 - PWM Limit, 8 - Shutdown
-  // change_set_value : 설정 값
-  // change_set_mode가 -1일 경우 모두 기본값으로 설정
-  bool dynamixel_rdk_ros2::setupMotor(uint8_t id, uint8_t change_set_mode, uint8_t change_set_value)
-  {
-    dxl_variable_init();
-
-    // 토크 해제
-    if (!setTorque(id, TORQUEOFF))
-    {
-      return false;
-    }
-
-    switch (change_set_mode)
-    {
-    case 0:
-      // 모터 작동모드 설정 - 위치제어 모드(3)
-      if (!setOperatingMode(id, change_set_value))
-      {
-        return false;
-      }
-      break;
-
-    case 1:
-      // 최소 위치 한계 설정 (기본값: 0)
-      dxl_comm_result = packet_handler_->write4ByteTxRx(port_handler_, id, EEPROM::MIN_POSITION_LIMIT.first, change_set_value, &dxl_error);
-
-      if (dxl_comm_result != COMM_SUCCESS)
-      {
-        RCLCPP_ERROR(this->get_logger(),
-                     "Failed to set min position limit for ID %d: %s",
-                     id, packet_handler_->getTxRxResult(dxl_comm_result));
-        return false;
-      }
-      break;
-
-    case 2:
-      // 최대 위치 한계 설정 (기본값 : 4095)
-      dxl_comm_result = packet_handler_->write4ByteTxRx(port_handler_, id, EEPROM::MAX_POSITION_LIMIT.first, change_set_value, &dxl_error);
-
-      if (dxl_comm_result != COMM_SUCCESS)
-      {
-        RCLCPP_ERROR(this->get_logger(),
-                     "Failed to set max position limit for ID %d: %s",
-                     id, packet_handler_->getTxRxResult(dxl_comm_result));
-        return false;
-      }
-      break;
-
-    case 3:
-      // 최대 속도 설정 (기본값 : 210)
-      dxl_comm_result = packet_handler_->write4ByteTxRx(port_handler_, id, EEPROM::VELOCITY_LIMIT.first, change_set_value, &dxl_error);
-      if (dxl_comm_result != COMM_SUCCESS)
-      {
-        RCLCPP_ERROR(this->get_logger(),
-                     "Failed to set max velocity limit for ID %d: %s",
-                     id, packet_handler_->getTxRxResult(dxl_comm_result));
-        return false;
-      }
-      break;
-
-    case 4:
-      // 가속도 제한 설정 (기본값: 32767)
-      dxl_comm_result = packet_handler_->write4ByteTxRx(port_handler_, id, EEPROM::ACCELERATION_LIMIT.first, change_set_value, &dxl_error);
-
-      if (dxl_comm_result != COMM_SUCCESS)
-      {
-        RCLCPP_ERROR(this->get_logger(),
-                     "Failed to set acceleration limit for ID %d: %s",
-                     id, packet_handler_->getTxRxResult(dxl_comm_result));
-        return false;
-      }
-      break;
-
-    case 5:
-      // 온도 제한 설정 (기본값: 80)
-      dxl_comm_result = packet_handler_->write1ByteTxRx(port_handler_, id, EEPROM::TEMPERATURE_LIMIT.first, change_set_value, &dxl_error);
-
-      if (dxl_comm_result != COMM_SUCCESS)
-      {
-        RCLCPP_ERROR(this->get_logger(),
-                     "Failed to set temperature limit for ID %d: %s",
-                     id, packet_handler_->getTxRxResult(dxl_comm_result));
-        return false;
-      }
-      break;
-
-    case 6:
-      // 전류 제한 설정 (기본값: 2047)
-      dxl_comm_result = packet_handler_->write2ByteTxRx(port_handler_, id, EEPROM::CURRENT_LIMIT.first, change_set_value, &dxl_error);
-
-      if (dxl_comm_result != COMM_SUCCESS)
-      {
-        RCLCPP_ERROR(this->get_logger(),
-                     "Failed to set current limit for ID %d: %s",
-                     id, packet_handler_->getTxRxResult(dxl_comm_result));
-        return false;
-      }
-      break;
-
-    case 7:
-      // PWM 제한 설정 (기본값: 885)
-      dxl_comm_result = packet_handler_->write2ByteTxRx(port_handler_, id, EEPROM::PWM_LIMIT.first, change_set_value, &dxl_error);
-
-      if (dxl_comm_result != COMM_SUCCESS)
-      {
-        RCLCPP_ERROR(this->get_logger(),
-                     "Failed to set PWM limit for ID %d: %s",
-                     id, packet_handler_->getTxRxResult(dxl_comm_result));
-        return false;
-      }
-      break;
-
-    case 8:
-      // 셧다운 설정 (기본값: 52)
-      dxl_comm_result = packet_handler_->write1ByteTxRx(port_handler_, id, EEPROM::SHUTDOWN.first, change_set_value, &dxl_error);
-
-      if (dxl_comm_result != COMM_SUCCESS)
-      {
-        RCLCPP_ERROR(this->get_logger(),
-                     "Failed to set shutdown configuration for ID %d: %s",
-                     id, packet_handler_->getTxRxResult(dxl_comm_result));
-        return false;
-      }
-      break;
-
-    default:
-      break;
-    }
-
-    // 토크 설정
-    if (!setTorque(id, TORQUEON))
-    {
-      return false;
-    }
-
-    return true;
   }
 
   // -------------------------------------------------------------- Motor Status Getter --------------------------------------------------------------
@@ -453,165 +317,141 @@ namespace dynamixel_rdk_ros2
     return BulkWrite(EEPROM::SHUTDOWN, motor_settings, "shutdown");
   }
 
-  // double dynamixel_rdk_ros2::convertPositionToRadian(int position, int min, int max)
-  // {
-  //   if (position < min || position > max)
-  //   {
-  //     return 0.0;
-  //   }
+// change_set_mode : 0 - Operating Mode, 1 - Min Position Limit, 2 - Max Position Limit, 3 - Max Velocity Limit, 4 - Acceleration Limit, 5 - Temperature Limit, 6 - Current Limit, 7 - PWM Limit, 8 - Shutdown
+template<typename C>
+bool dynamixel_rdk_ros2::DefaultSettingChange(uint8_t change_set_mode, const std::vector<C>& change_set_value_vec)
+{
+  // change_set_mode : 설정할 모드
+  // change_set_value : 설정 값
+  // change_set_mode가 -1일 경우 모두 기본값으로 설정
 
-  //   // 0~1 비율로 정규화한 뒤 -π ~ +π로 변환
-  //   double ratio = static_cast<double>(position - min) / (max - min);
-  //   return (2.0 * M_PI * ratio) - M_PI;
-  // }
-
-  // change_set_mode : 0 - Operating Mode, 1 - Min Position Limit, 2 - Max Position Limit, 3 - Max Velocity Limit, 4 - Acceleration Limit, 5 - Temperature Limit, 6 - Current Limit, 7 - PWM Limit, 8 - Shutdown
-  bool dynamixel_rdk_ros2::DefaultSettingChange(uint8_t change_set_mode, int8_t change_set_value_arr[])
+  for (auto id : motor_ids_)
   {
-    // change_set_mode : 설정할 모드
-    // change_set_value : 설정 값
-    // change_set_mode가 -1일 경우 모두 기본값으로 설정
-
-    for (auto id : motor_ids_)
+    // 토크 해제
+    if (!setTorque(id, TORQUEOFF))
     {
-      // 토크 해제
-      if (!setTorque(id, TORQUEOFF))
-      {
-        return false;
-      }
+      return false;
     }
-
-    switch (change_set_mode)
-    {
-    case MIN_POSITION_LIMIT_CASE:
-      // 최소 위치 한계 설정 (기본값: 0)
-      for (int i = 0; i < TOTAL_MOTOR; i++)
-      {
-        int id = motor_ids_[i];
-        motor_settings[id].min_position_limit = change_set_value_arr[i];
-      }
-      if (!setMinPositionLimit())
-      {
-          return false;
-      }
-      break;
-
-    case MAX_POSITION_LIMIT_CASE:
-      // 최대 위치 한계 설정 (기본값 : 4095)
-      for (int i = 0; i < TOTAL_MOTOR; i++)
-      {
-        int id = motor_ids_[i];
-        motor_settings[id].min_position_limit = change_set_value_arr[i];
-      }
-      if (!setMaxPositionLimit())
-      {
-        return false;
-      }
-      break;
-
-    case VELOCITY_LIMIT_CASE:
-      // 최대 속도 설정 (기본값 : 210)
-      for (int i = 0; i < TOTAL_MOTOR; i++)
-      {
-        int id = motor_ids_[i];
-        motor_settings[id].max_velocity_limit = change_set_value_arr[i];
-      }
-      if (!setMaxVelocityLimit())
-      {
-        return false;
-      }
-      break;
-
-    case ACCELERATION_LIMIT_CASE:
-      // 최대 가속도 설정 (기본값 : 50)
-      for (int i = 0; i < TOTAL_MOTOR; i++)
-      {
-        int id = motor_ids_[i];
-        motor_settings[id].max_acceleration_limit = change_set_value_arr[i];
-      }
-      if (!setMaxAccelerationLimit())
-      {
-        return false;
-      }
-      break;
-
-    case TEMPERATURE_LIMIT_CASE:
-      // 온도 제한 설정 (기본값: 80)
-      for (int i = 0; i < TOTAL_MOTOR; i++)
-      {
-        int id = motor_ids_[i];
-        motor_settings[id].temperature_limit = change_set_value_arr[i];
-      }
-      break;
-
-    case CURRENT_LIMIT_CASE:
-      // 전류 제한 설정 (기본값: 2047)
-      for (int i = 0; i < TOTAL_MOTOR; i++)
-      {
-        int id = motor_ids_[i];
-        motor_settings[id].current_limit = change_set_value_arr[i];
-      }
-      break;
-
-    case PWM_LIMIT_CASE:
-      // PWM 제한 설정 (기본값: 885)
-      for (int i = 0; i < TOTAL_MOTOR; i++)
-      {
-        int id = motor_ids_[i];
-        motor_settings[id].pwm_limit = change_set_value_arr[i];
-      }
-
-      if (!setPwmLimit())
-      {
-        return false;
-      }
-
-      break;
-
-    case SHUTDOWN_CASE:
-      // 셧다운 설정 (기본값: 52)
-      for (int i = 0; i < TOTAL_MOTOR; i++)
-      {
-        int id = motor_ids_[i];
-        motor_settings[id].shutdown = change_set_value_arr[i];
-      }
-      if (!setShutdown())
-      {
-        return false;
-      }
-      break;
-
-    default:
-      // 모든 모터를 기본값으로 설정
-      RCLCPP_INFO(this->get_logger(), "exceeded the size of the mode you can select");
-      RCLCPP_INFO(this->get_logger(), "Setting all motors to default values");
-
-      for (int i = 0; i < TOTAL_MOTOR; i++)
-      {
-        int id = motor_ids_[i];
-        motor_settings[id].min_position_limit = 0;
-        motor_settings[id].max_position_limit = 4095;
-        motor_settings[id].max_velocity_limit = 210;
-        motor_settings[id].max_acceleration_limit = 50;
-        motor_settings[id].temperature_limit = 80;
-        motor_settings[id].current_limit = 2047;
-        motor_settings[id].pwm_limit = 885;
-        motor_settings[id].shutdown = 52;
-      }
-      break;
-    }
-
-    // 토크 설정
-    for (auto id : motor_ids_)
-    {
-      if (!setTorque(id, TORQUEON))
-      {
-        return false;
-      }
-    }
-
-    return true;
   }
+
+  switch (change_set_mode)
+  {
+  case MIN_POSITION_LIMIT_CASE:
+    // 최소 위치 한계 설정 (기본값: 0)
+    for (int i = 0; i < TOTAL_MOTOR; i++)
+    {
+      motor_settings[TOTAL_MOTOR].min_position_limit = radianToTick(change_set_value_vec[i]);
+    }
+    if (!setMinPositionLimit())
+    {
+        return false;
+    }
+    break;
+
+  case MAX_POSITION_LIMIT_CASE:
+    // 최대 위치 한계 설정 (기본값 : 4095)
+    for (int i = 0; i < TOTAL_MOTOR; i++)
+    {
+      motor_settings[TOTAL_MOTOR].max_position_limit = radianToTick(change_set_value_vec[i]);
+    }
+    if (!setMaxPositionLimit())
+    {
+      return false;
+    }
+    break;
+
+  case VELOCITY_LIMIT_CASE:
+    // 최대 속도 설정 (기본값 : 210)
+    for (int i = 0; i < TOTAL_MOTOR; i++)
+    {
+      motor_settings[TOTAL_MOTOR].max_velocity_limit = static_cast<int32_t>(change_set_value_vec[i]);
+    }
+    if (!setMaxVelocityLimit())
+    {
+      return false;
+    }
+    break;
+
+  case ACCELERATION_LIMIT_CASE:
+    // 최대 가속도 설정 (기본값 : 50)
+    for (int i = 0; i < TOTAL_MOTOR; i++)
+    {
+      motor_settings[TOTAL_MOTOR].max_acceleration_limit = static_cast<int32_t>(change_set_value_vec[i]);
+    }
+    if (!setMaxAccelerationLimit())
+    {
+      return false;
+    }
+    break;
+
+  case TEMPERATURE_LIMIT_CASE:
+    // 온도 제한 설정 (기본값: 80)
+    for (int i = 0; i < TOTAL_MOTOR; i++)
+    {
+      motor_settings[TOTAL_MOTOR].temperature_limit = static_cast<int32_t>(change_set_value_vec[i]);
+    }
+    if( !setTemperatureLimit())
+    {
+      return false;
+    }
+    break;
+
+  case CURRENT_LIMIT_CASE:
+    // 전류 제한 설정 (기본값: 2047)
+    for (int i = 0; i < TOTAL_MOTOR; i++)
+    {
+      motor_settings[TOTAL_MOTOR].current_limit = static_cast<int32_t>(change_set_value_vec[i]);
+    }
+    if(!setCurrentLimit())
+    {
+      return false;
+    }
+    break;
+
+  case PWM_LIMIT_CASE:
+    // PWM 제한 설정 (기본값: 885)
+    for (int i = 0; i < TOTAL_MOTOR; i++)
+    {
+      motor_settings[TOTAL_MOTOR].pwm_limit = static_cast<int32_t>(change_set_value_vec[i]);
+    }
+    if (!setPwmLimit())
+    {
+      return false;
+    }
+
+    break;
+
+  case SHUTDOWN_CASE:
+    // 셧다운 설정 (기본값: 52)
+    for (int i = 0; i < TOTAL_MOTOR; i++)
+    {
+      motor_settings[TOTAL_MOTOR].shutdown = static_cast<int32_t>(change_set_value_vec[i]);
+    }
+    if (!setShutdown())
+    {
+      return false;
+    }
+    break;
+
+  default:
+    // 모든 모터를 기본값으로 설정
+    RCLCPP_INFO(this->get_logger(), "exceeded the size of the mode you can select");
+    RCLCPP_INFO(this->get_logger(), "Setting all motors to default values");
+
+    break;
+  }
+
+  // 토크 설정
+  for (auto id : motor_ids_)
+  {
+    if (!setTorque(id, TORQUEON))
+    {
+      return false;
+    }
+  }
+
+  return true;
+}
 
   // -------------------------------------------------------------- Motor Control --------------------------------------------------------------
 
@@ -675,12 +515,13 @@ namespace dynamixel_rdk_ros2
   {
     motorCheck(); // 연결 상태 확인
 
+    MotorStatus status;
     dynamixel_sdk_custom_interfaces::msg::CurrentMotorStatus msg;
     const size_t TOTAL_CONNECT_MOTORS = connected_motor_ids_.size();
 
     ResizeMsg(msg, TOTAL_CONNECT_MOTORS);
 
-    bool sync_success =
+    bool sync_success = false;
         getCurrentPositionSync() &&
         getGoalPositionSync() &&
         getCurrentVelocitySync() &&
@@ -698,16 +539,16 @@ namespace dynamixel_rdk_ros2
       {
         uint8_t id = connected_motor_ids_[index];
 
-        if (!getCurrentPosition(id, motor_status[TOTAL_MOTOR+1].position)) RCLCPP_ERROR(this->get_logger(), "[ID:%d] Failed to get Current Position", id);
-        else if (!getGoalPosition(id, motor_status[TOTAL_MOTOR+1].goal_position)) RCLCPP_ERROR(this->get_logger(), "[ID:%d] Failed to get Goal Position", id);
-        else if (!getCurrentVelocity(id, motor_status[TOTAL_MOTOR+1].velocity)) RCLCPP_ERROR(this->get_logger(), "[ID:%d] Failed to get Current Velocity", id);
-        else if (!getInputVoltage(id, motor_status[TOTAL_MOTOR+1].voltage)) RCLCPP_ERROR(this->get_logger(), "[ID:%d] Failed to get Input Voltage", id);
-        else if (!getCurrentTemperature(id, motor_status[TOTAL_MOTOR+1].temperature)) RCLCPP_ERROR(this->get_logger(), "[ID:%d] Failed to get Current Temperature", id);
-        else if (!getCurrentTorque(id, motor_status[TOTAL_MOTOR+1].torque)) RCLCPP_ERROR(this->get_logger(), "[ID:%d] Failed to get Current Torque", id);
-        else if (!getMovingStatus(id, motor_status[TOTAL_MOTOR+1].moving_status)) RCLCPP_ERROR(this->get_logger(), "[ID:%d] Failed to get Moving Status", id);
-        else if (!HardwareErrorStatus(id, motor_status[TOTAL_MOTOR+1].error_status)) RCLCPP_ERROR(this->get_logger(), "[ID:%d] Failed to get Hardware Error Status", id);
+        if (!getCurrentPosition(id, status.position)) RCLCPP_ERROR(this->get_logger(), "[ID:%d] Failed to get Current Position", id);
+        else if (!getGoalPosition(id, status.goal_position)) RCLCPP_ERROR(this->get_logger(), "[ID:%d] Failed to get Goal Position", id);
+        else if (!getCurrentVelocity(id, status.velocity)) RCLCPP_ERROR(this->get_logger(), "[ID:%d] Failed to get Current Velocity", id);
+        else if (!getInputVoltage(id, status.voltage)) RCLCPP_ERROR(this->get_logger(), "[ID:%d] Failed to get Input Voltage", id);
+        else if (!getCurrentTemperature(id, status.temperature)) RCLCPP_ERROR(this->get_logger(), "[ID:%d] Failed to get Current Temperature", id);
+        else if (!getCurrentTorque(id, status.torque)) RCLCPP_ERROR(this->get_logger(), "[ID:%d] Failed to get Current Torque", id);
+        else if (!getMovingStatus(id, status.moving_status)) RCLCPP_ERROR(this->get_logger(), "[ID:%d] Failed to get Moving Status", id);
+        else if (!HardwareErrorStatus(id, status.error_status)) RCLCPP_ERROR(this->get_logger(), "[ID:%d] Failed to get Hardware Error Status", id);
 
-        msgUpdate(msg, index, motor_status[TOTAL_MOTOR+1].position, motor_status[TOTAL_MOTOR+1].velocity, motor_status[TOTAL_MOTOR+1].voltage, motor_status[TOTAL_MOTOR+1].temperature, motor_status[TOTAL_MOTOR+1].torque, motor_status[TOTAL_MOTOR+1].moving_status, motor_status[TOTAL_MOTOR+1].error_status);
+        msgUpdate(msg, index, status.position, status.velocity, status.voltage, status.temperature, status.torque, status.moving_status, status.error_status);
       }
     }
 
@@ -737,30 +578,32 @@ namespace dynamixel_rdk_ros2
 
   bool dynamixel_rdk_ros2::errorInterface(uint8_t id)
   {
-    HardwareErrorStatus(id, motor_status[TOTAL_MOTOR+1].error_status);
+    uint8_t error_status = 0;
 
-    if (motor_status[TOTAL_MOTOR+1].error_status & 0b00000001) // 비트 0: 입력 전압 오류
+    HardwareErrorStatus(id, error_status);
+
+    if (error_status & 0b00000001) // 비트 0: 입력 전압 오류
     {
       RCLCPP_ERROR(this->get_logger(), "ID %d: Input voltage error detected!", id);
     }
 
-    if (motor_status[TOTAL_MOTOR+1].error_status & 0b00000100) // 비트 2: 과열 오류
+    if (error_status & 0b00000100) // 비트 2: 과열 오류
     {
       RCLCPP_ERROR(this->get_logger(), "ID %d: Overheating error detected!", id);
     }
 
-    if (motor_status[TOTAL_MOTOR+1].error_status & 0b00001000) // 비트 3: 엔코더 오류
+    if (error_status & 0b00001000) // 비트 3: 엔코더 오류
     {
       RCLCPP_ERROR(this->get_logger(), "ID %d: Encoder error detected!", id);
       RCLCPP_ERROR(this->get_logger(), "ID %d: Please check the cable connection", id);
     }
 
-    if (motor_status[TOTAL_MOTOR+1].error_status & 0b00010000) // 비트 4: 전기적 충격 오류
+    if (error_status & 0b00010000) // 비트 4: 전기적 충격 오류
     {
       RCLCPP_ERROR(this->get_logger(), "ID %d: Electrical shock error detected!", id);
     }
 
-    if (motor_status[TOTAL_MOTOR+1].error_status & 0b00100000) // 비트 5: 과부하 오류
+    if (error_status & 0b00100000) // 비트 5: 과부하 오류
     {
       RCLCPP_ERROR(this->get_logger(), "ID %d: Overload error detected!", id);
     }
@@ -1004,6 +847,7 @@ bool dynamixel_rdk_ros2::BulkWrite(const std::pair<int, int> &control_table_addr
 
 
 }
+
 int main(int argc, char *argv[])
 {
   rclcpp::init(argc, argv);

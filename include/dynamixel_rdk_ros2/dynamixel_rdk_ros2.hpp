@@ -65,9 +65,6 @@ namespace dynamixel_rdk_ros2
     std::vector<MotorSettings> motor_settings;
     std::vector<MotorStatus> motor_status;
 
-
-    bool SendMotorPacket();
-
     // 생성자 및 소멸자
     dynamixel_rdk_ros2();
     virtual ~dynamixel_rdk_ros2();
@@ -78,8 +75,6 @@ namespace dynamixel_rdk_ros2
 
     // 모터 제어 함수들
     bool setTorque(uint8_t id, bool enable);
-    bool setupMotor(uint8_t id, uint8_t change_set_mode, uint8_t change_set_value);
-    void setupTorqueJudgment(bool enable);
     bool setOperatingMode(uint8_t id, uint8_t mode);
 
     // 모터 상태 확인 함수들
@@ -97,6 +92,7 @@ namespace dynamixel_rdk_ros2
     std::string device_port_;
     int baud_rate_;
     float protocol_version_;
+
     std::vector<int> motor_ids_;
     std::vector<int> connected_motor_ids_;
     std::vector<int> disconnected_motor_ids_;
@@ -173,7 +169,8 @@ namespace dynamixel_rdk_ros2
     bool sendMotorPacket(std::vector<double> position, std::vector<double> velocity, std::vector<double> acceleration);
 
     // 설정 변경 함수
-    bool DefaultSettingChange(uint8_t change_set_mode, int8_t change_set_value_arr[]);
+    template<typename C>
+    bool DefaultSettingChange(uint8_t change_set_mode, const std::vector<C>& change_set_value_vec);
 
     // 콜백 및 유틸리티 함수들
     void timer_callback();
