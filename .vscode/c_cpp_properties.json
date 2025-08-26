@@ -1,32 +1,22 @@
 {
   "configurations": [
     {
-      "browse": {
-        "databaseFilename": "${default}",
-        "limitSymbolsToIncludedHeaders": false
-      },
-      "includePath": [
-        "/home/eungang/ros2_ws/install/dynamixel_rdk_ros2/include/**",
-        "/home/eungang/ros2_ws/install/dynamixel_sdk_custom_interfaces/include/**",
-        "/home/eungang/ros2_ws/install/dynamixel_sdk/include/**",
-        "/opt/ros/humble/include/**",
-        "/home/eungang/ros2_ws/src/DynamixelSDK/dynamixel_sdk/include/**",
-        "/home/eungang/ros2_ws/src/DynamixelSDK/dynamixel_sdk_examples/include/**",
-        "/home/eungang/ros2_ws/src/dynamixel_rdk_interface/include/**",
-        "/home/eungang/ros2_ws/src/dynamixel_rdk_ros2/dynamixel_rdk_ros2/include/**",
-        "/home/eungang/ros2_ws/src/test_communication_pkg/include/**",
-        "/home/eungang/ros2_ws/src/dynamixel_rdk_ros2/include/dynamixel_rdk_ros2/include/**",
-        "/usr/include/**",
-        "${workspaceFolder}/**",
-        "/home/eungang/ros2_ws/install/**",
-        "/home/eungang/ros2_ws/build/dynamixel_rdk_interface/**",
-        "/opt/ros/humble/include/**"
-      ],
       "name": "ROS",
       "intelliSenseMode": "gcc-x64",
       "compilerPath": "/usr/bin/gcc",
       "cStandard": "gnu11",
-      "cppStandard": "c++14"
+      "cppStandard": "c++14",
+      "compileCommands": "/home/ek/ros2_ws/build/compile_commands.json",
+      "includePath": [
+        "${workspaceFolder}/install/**",
+        "${workspaceFolder}/src/**",
+        "/opt/ros/humble/include/**",
+        "/usr/include/**"
+      ],
+      "browse": {
+        "limitSymbolsToIncludedHeaders": false,
+        "databaseFilename": ""
+      }
     }
   ],
   "version": 4

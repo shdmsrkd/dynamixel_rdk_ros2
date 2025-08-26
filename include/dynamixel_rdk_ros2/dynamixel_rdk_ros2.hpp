@@ -93,6 +93,8 @@ namespace dynamixel_rdk_ros2
     int baud_rate_;
     float protocol_version_;
 
+    std::vector<double> min_position_limits_;
+    std::vector<double> max_position_limits_;
     std::vector<int> motor_ids_;
     std::vector<int> connected_motor_ids_;
     std::vector<int> disconnected_motor_ids_;
@@ -119,24 +121,24 @@ namespace dynamixel_rdk_ros2
     rclcpp::TimerBase::SharedPtr getting_timer_;
 
     // 모터 상태 읽기 함수들 (Getter)
-    bool getCurrentPosition(uint8_t id, uint32_t &position);
-    bool getGoalPosition(uint8_t id, uint32_t &goal_position);
-    bool getCurrentVelocity(uint8_t id, uint8_t &velocity);
-    bool getInputVoltage(uint8_t id, uint16_t &voltage);
-    bool getCurrentTemperature(uint8_t id, uint8_t &temperature);
-    bool getCurrentTorque(uint8_t id, uint16_t &torque);
-    bool getMovingStatus(uint8_t id, uint8_t &moving_status);
-    bool HardwareErrorStatus(uint8_t id, uint8_t &error_status);
+    // bool getCurrentPosition(uint8_t id, uint32_t &position);
+    // bool getGoalPosition(uint8_t id, uint32_t &goal_position);
+    // bool getCurrentVelocity(uint8_t id, uint8_t &velocity);
+    // bool getInputVoltage(uint8_t id, uint16_t &voltage);
+    // bool getCurrentTemperature(uint8_t id, uint8_t &temperature);
+    // bool getCurrentTorque(uint8_t id, uint16_t &torque);
+    // bool getMovingStatus(uint8_t id, uint8_t &moving_status);
+    // bool HardwareErrorStatus(uint8_t id, uint8_t &error_status);
 
-    // 모터 상태 읽기 함수들(Getter) - Sync
-    bool getCurrentPositionSync();
-    bool getGoalPositionSync();
-    bool getCurrentVelocitySync();
-    bool getInputVoltageSync();
-    bool getCurrentTemperatureSync();
-    bool getCurrentTorqueSync();
-    bool getMovingStatusSync();
-    bool HardwareErrorStatusSync();
+    // // 모터 상태 읽기 함수들(Getter) - Sync
+    // bool getCurrentPositionSync();
+    // bool getGoalPositionSync();
+    // bool getCurrentVelocitySync();
+    // bool getInputVoltageSync();
+    // bool getCurrentTemperatureSync();
+    // bool getCurrentTorqueSync();
+    // bool getMovingStatusSync();
+    // bool HardwareErrorStatusSync();
 
     // 모터 기본값 설정 함수들(Setter)
     bool setMinPositionLimit();
@@ -187,18 +189,26 @@ namespace dynamixel_rdk_ros2
 
     int32_t radianToTick(double rad)
     {
-      rad = std::clamp(rad, -M_PI, M_PI);
       return static_cast<int32_t>((rad + M_PI) * (4095.0 / (2 * M_PI)));
     }
 
-    int velToRadian(int velocity)
+    int velToRadian(double velocity)
     {
-      return (velocity / dxl_rps_ratio);
+      int velocity_data;
+
+      if (velocity <= 0.0)
+      {velocity_data = 0;}
+
+      return velocity_data;
     }
 
-    int accToRadian(int acceleration)
+    int accToRadian(double acceleration)
     {
-      return (acceleration / dxl_acc_ratio);
+      int acceleration_data;
+
+      if (acceleration <= 0.0)
+      {acceleration_data = 0;}
+      return acceleration_data;
     }
 
   };
