@@ -16,7 +16,11 @@ set(EXECUTABLES
 )
 
 foreach(executable ${EXECUTABLES})
-  add_executable(${executable} src/${executable}.cpp)
+  add_executable(${executable} 
+    src/${executable}.cpp
+    src/motor_status.cpp
+    src/motor_setting.cpp
+  )
 
   target_include_directories(${executable} PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>

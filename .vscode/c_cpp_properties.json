@@ -1,23 +1,19 @@
 {
-  "configurations": [
-    {
-      "name": "ROS",
-      "intelliSenseMode": "gcc-x64",
-      "compilerPath": "/usr/bin/gcc",
-      "cStandard": "gnu11",
-      "cppStandard": "c++14",
-      "compileCommands": "/home/ek/ros2_ws/build/compile_commands.json",
-      "includePath": [
-        "${workspaceFolder}/install/**",
-        "${workspaceFolder}/src/**",
-        "/opt/ros/humble/include/**",
-        "/usr/include/**"
-      ],
-      "browse": {
-        "limitSymbolsToIncludedHeaders": false,
-        "databaseFilename": ""
-      }
-    }
-  ],
-  "version": 4
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "/opt/ros/humble/include/**",
+                "/home/ek/ros2_ws/install/*/include/**",
+                "/home/ek/ros2_ws/src/*/include/**"
+            ],
+            "defines": [],
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "c17",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "linux-gcc-x64"
+        }
+    ],
+    "version": 4
 }

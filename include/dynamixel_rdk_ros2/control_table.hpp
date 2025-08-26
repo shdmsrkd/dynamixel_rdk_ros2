@@ -21,6 +21,30 @@
 
 namespace dynamixel_rdk_ros2
 {
+
+// Dynamixel MX Series Profile
+#define MX_RPS_PROFILE 0.229     // [rev/min]
+#define MX_ACC_PROFILE 214.577   // [rev/min^2]
+#define MX_CURRENT_PROFILE 3.36  // [mA]
+
+#define MIN_POSITION_LIMIT_CASE 0
+#define MAX_POSITION_LIMIT_CASE 1
+#define VELOCITY_LIMIT_CASE 2
+#define ACCELERATION_LIMIT_CASE 3
+#define TEMPERATURE_LIMIT_CASE 4
+#define CURRENT_LIMIT_CASE 5
+#define PWM_LIMIT_CASE 6
+#define SHUTDOWN_CASE 7
+
+#define READ 0
+#define WRITE 1
+
+#define TORQUEOFF 0
+#define TORQUEON 1
+
+#define CURRENT_CONTROL_MODE 0
+
+
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
 namespace EEPROM
@@ -49,7 +73,6 @@ constexpr std::pair<int, int> MIN_POSITION_LIMIT = {52, 4}; // Min Position Limi
 constexpr std::pair<int, int> SHUTDOWN = {63, 1};           // Shutdown, Read/Write, Default: 52 std::
 }  // namespace EEPROM
 
-// Dynamixel MX Series RAM Area
 namespace MXRAM
 {
 constexpr std::pair<int, int> TORQUE_ENABLE = {64, 1};          // Torque Enable, Read/Write, Default: 0
@@ -82,9 +105,8 @@ constexpr std::pair<int, int> VELOCITY_TRAJECTORY = {136, 4};   // Velocity Traj
 constexpr std::pair<int, int> POSITION_TRAJECTORY = {140, 4};   // Position Trajectory, Read, Default: -
 constexpr std::pair<int, int> PRESENT_INPUT_VOLTAGE = {144, 2}; // Present Input Voltage, Read, Default: -
 constexpr std::pair<int, int> PRESENT_TEMPERATURE = {146, 1};   // Present Temperature, Read, Default: -
-};          // namespace MXRAM
+};// namespace MXRAM
 
-// Dynamixel PRO Series RAM Area
 namespace PRORAM
 {
 constexpr std::pair<int, int> TORQUE_ENABLE = {512, 1};           // Torque Enable, Read/Write, Default: 0
@@ -120,7 +142,11 @@ constexpr std::pair<int, int> POSITION_TRAJECTORY = {588, 4};     // Position Tr
 constexpr std::pair<int, int> PRESENT_INPUT_VOLTAGE = {592, 2};   // Present Input Voltage, Read, Default: -
 constexpr std::pair<int, int> PRESENT_TEMPERATURE = {594, 1};     // Present Temperature, Read, Default: -
 constexpr std::pair<int, int> BACKUP_READY = {878, 1};            // Control data Backup Ready, Read, Default: 0
-};          // namespace PRORAM
+}; // namespace PRORAM
+
+
+
+
 }  // namespace dynamixel_rdk_ros
 
 #endif  // DYNAMIXEL_RDK_ROS_CONTROL_TABLE_HPP_
