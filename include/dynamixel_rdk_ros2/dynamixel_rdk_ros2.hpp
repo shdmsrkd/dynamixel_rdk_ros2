@@ -8,10 +8,10 @@
 #include "dynamixel_rdk_ros2/motor_status.hpp"
 #include "dynamixel_rdk_ros2/motor_setting.hpp"
 
-#include "dynamixel_sdk_custom_interfaces/msg/current_motor_status.hpp"
-#include "dynamixel_sdk_custom_interfaces/msg/warning_status.hpp"
-#include "dynamixel_sdk_custom_interfaces/msg/dynamixel_control_msgs.hpp"
-#include "dynamixel_sdk_custom_interfaces/msg/dynamixel_msgs.hpp"
+#include "dynamixel_rdk_ros2/msg/current_motor_status.hpp"
+#include "dynamixel_rdk_ros2/msg/warning_status.hpp"
+#include "dynamixel_rdk_ros2/msg/dynamixel_control_msgs.hpp"
+#include "dynamixel_rdk_ros2/msg/dynamixel_msgs.hpp"
 
 
 namespace dynamixel_rdk_ros2
@@ -58,16 +58,16 @@ namespace dynamixel_rdk_ros2
     dynamixel::PacketHandler *packet_handler_;
 
   private:
-    // Motor status and setting handlers
+    // 다른 클래스 핸들러들
     std::unique_ptr<MotorStatus> motor_status_handler_;
     std::unique_ptr<MotorSetting> motor_setting_handler_;
 
     // Publisher들
-    rclcpp::Publisher<dynamixel_sdk_custom_interfaces::msg::CurrentMotorStatus>::SharedPtr motor_status_pubisher_;
-    rclcpp::Publisher<dynamixel_sdk_custom_interfaces::msg::WarningStatus>::SharedPtr warning_status_publisher_;
+    rclcpp::Publisher<::dynamixel_rdk_ros2::msg::CurrentMotorStatus>::SharedPtr motor_status_pubisher_;
+    rclcpp::Publisher<::dynamixel_rdk_ros2::msg::WarningStatus>::SharedPtr warning_status_publisher_;
 
     // Subscriber들
-    rclcpp::Subscription<dynamixel_sdk_custom_interfaces::msg::DynamixelControlMsgs>::SharedPtr ik2rdk_sub;
+    rclcpp::Subscription<::dynamixel_rdk_ros2::msg::DynamixelControlMsgs>::SharedPtr ik2rdk_sub;
 
     // Timer
     rclcpp::TimerBase::SharedPtr getting_timer_;
@@ -76,10 +76,10 @@ namespace dynamixel_rdk_ros2
     std::vector<MotorStatus::MotorStatusConfig> motor_status;
     // 콜백 및 유틸리티 함수들
     void timer_callback();
-    void dynamixel_control_callback(const dynamixel_sdk_custom_interfaces::msg::DynamixelControlMsgs & msg);
+    void dynamixel_control_callback(const ::dynamixel_rdk_ros2::msg::DynamixelControlMsgs & msg);
     void dxl_variable_init();
-    void ResizeMsg(dynamixel_sdk_custom_interfaces::msg::CurrentMotorStatus &msg, size_t size);
-    void msgUpdate(dynamixel_sdk_custom_interfaces::msg::CurrentMotorStatus &msg, size_t index,
+    void ResizeMsg(::dynamixel_rdk_ros2::msg::CurrentMotorStatus &msg, size_t size);
+    void msgUpdate(::dynamixel_rdk_ros2::msg::CurrentMotorStatus &msg, size_t index,
                    uint32_t position, uint8_t velocity, uint16_t voltage,
                    uint8_t temperature, uint16_t torque, uint8_t moving_status, uint8_t error_status);
 

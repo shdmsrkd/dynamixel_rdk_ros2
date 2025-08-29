@@ -12,7 +12,7 @@ def generate_launch_description():
 
     dynamixel_rdk_node = Node(
         package='dynamixel_rdk_ros2',
-        executable='dynamixel_rdk_ros2',
+        executable='dynamixel_rdk_ros2_node',
         name='dynamixel_rdk_ros2_node',
         output='screen',
         emulate_tty=True,

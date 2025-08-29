@@ -6,13 +6,29 @@
                 "${workspaceFolder}/**",
                 "/opt/ros/humble/include/**",
                 "/home/ek/ros2_ws/install/*/include/**",
-                "/home/ek/ros2_ws/src/*/include/**"
+                "/home/ek/ros2_ws/src/*/include/**",
+                "/home/ek/ros2_ws/build/dynamixel_rdk_ros2/rosidl_generator_cpp/**",
+                "/home/ek/ros2_ws/install/dynamixel_sdk/include/**",
+                "/opt/ros/humble/include/rclcpp/**",
+                "/opt/ros/humble/include/std_msgs/**",
+                "/opt/ros/humble/include/geometry_msgs/**",
+                "/opt/ros/humble/include/sensor_msgs/**",
+                "/opt/ros/humble/include/rosidl_runtime_cpp/**",
+                "/opt/ros/humble/include/rosidl_typesupport_cpp/**",
+                "/opt/ros/humble/include/rcutils/**",
+                "/opt/ros/humble/include/rmw/**"
             ],
-            "defines": [],
-            "compilerPath": "/usr/bin/gcc",
+            "defines": [
+                "ROS_PACKAGE_NAME=\"dynamixel_rdk_ros2\"",
+                "__STDC_FORMAT_MACROS",
+                "RCUTILS_ENABLE_FAULT_INJECTION"
+            ],
+            "compilerPath": "/usr/bin/g++",
             "cStandard": "c17",
             "cppStandard": "c++17",
-            "intelliSenseMode": "linux-gcc-x64"
+            "intelliSenseMode": "linux-gcc-x64",
+            "compileCommands": "/home/ek/ros2_ws/build/dynamixel_rdk_ros2/compile_commands.json",
+            "configurationProvider": "ms-vscode.cmake-tools"
         }
     ],
     "version": 4

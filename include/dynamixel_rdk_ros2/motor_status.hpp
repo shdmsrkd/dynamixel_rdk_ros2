@@ -48,7 +48,6 @@ namespace dynamixel_rdk_ros2
     bool HardwareErrorStatusSync(const std::vector<uint8_t>& motor_ids, std::vector<MotorStatusConfig> &status_values);
 
   private:
-    std::vector<MotorStatus::MotorStatusConfig> motor_status_;
     dynamixel::PortHandler* port_handler_;
     dynamixel::PacketHandler* packet_handler_;
     rclcpp::Logger logger_;
