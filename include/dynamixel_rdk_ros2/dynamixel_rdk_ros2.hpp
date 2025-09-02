@@ -84,6 +84,7 @@ namespace dynamixel_rdk_ros2
                    uint8_t temperature, uint16_t torque, uint8_t moving_status, uint8_t error_status);
 
     int32_t radianToTick(double rad);
+    double tickToRadian(uint32_t position);
     bool start();
 
     // int velToRadian(double velocity)

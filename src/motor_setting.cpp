@@ -257,7 +257,6 @@ namespace dynamixel_rdk_ros2
     {
       std::vector<uint8_t> control_data_vector;
 
-      // Convert values (you may need to implement these conversion functions)
       uint32_t goal_position = static_cast<uint32_t>((position[i] + M_PI) * (4095.0 / (2 * M_PI)));
       uint32_t goal_velocity = static_cast<uint32_t>(velocity[i] <= 0.0 ? 0 : velocity[i]);
       uint32_t goal_acceleration = static_cast<uint32_t>(acceleration[i] <= 0.0 ? 0 : acceleration[i]);

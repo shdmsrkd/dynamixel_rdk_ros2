@@ -2,6 +2,7 @@
 #include "dynamixel_rdk_ros2/motor_status.hpp"
 #include <thread>
 #include <chrono>
+#include <cmath>
 
 namespace dynamixel_rdk_ros2
 {
@@ -301,6 +302,7 @@ void dynamixel_rdk_ros2::timer_callback()
   RCLCPP_INFO(this->get_logger(), "모터 총 개수 : %zu", motor_ids_.size());
   RCLCPP_INFO(this->get_logger(), "총 연결된 모터 개수 : %zu", TOTAL_CONNECT_MOTORS);
 
+  
   motor_status_pubisher_->publish(msg);
 }
   void dynamixel_rdk_ros2::dynamixel_control_callback(const ::dynamixel_rdk_ros2::msg::DynamixelControlMsgs &msg)
@@ -387,8 +389,10 @@ void dynamixel_rdk_ros2::timer_callback()
                                      uint32_t position, uint8_t velocity, uint16_t voltage,
                                      uint8_t temperature, uint16_t torque, uint8_t moving_status, uint8_t error_status)
   {
-    msg.position[index] = position;
-    msg.goal_position[index] = position; // goal_position 필드도 설정
+    double position_in_radians = tickToRadian(position);
+
+    msg.position[index] = position_in_radians;
+    msg.goal_position[index] = position_in_radians;
     msg.velocity[index] = velocity;
     msg.input_voltage[index] = voltage;
     msg.temperature[index] = temperature;
@@ -430,6 +434,16 @@ void dynamixel_rdk_ros2::timer_callback()
   //   }
   //   return true;
   // }
+
+  int32_t dynamixel_rdk_ros2::radianToTick(double rad)
+  {
+    return static_cast<int32_t>((rad * 4096) / (2 * M_PI));
+  }
+
+  double dynamixel_rdk_ros2::tickToRadian(uint32_t position)
+  {
+    return (static_cast<double>(position) * 2 * M_PI) / 4096.0;
+  }
 
 } // namespace dynamixel_rdk_ros2
 
