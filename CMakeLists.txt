@@ -10,16 +10,7 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(dynamixel_sdk REQUIRED)
 find_package(dynamixel_sdk_custom_interfaces REQUIRED)
-find_package(rosidl_default_generators REQUIRED)
-
-# Generate messages
-rosidl_generate_interfaces(${PROJECT_NAME}
-  "dynamixel_rdk_msgs/msg/CurrentMotorStatus.msg"
-  "dynamixel_rdk_msgs/msg/DynamixelControlMsgs.msg"
-  "dynamixel_rdk_msgs/msg/DynamixelMsgs.msg"
-  "dynamixel_rdk_msgs/msg/WarningStatus.msg"
-  DEPENDENCIES std_msgs
-)
+find_package(dynamixel_rdk_msgs REQUIRED)
 
 set(EXECUTABLES
   dynamixel_rdk_ros2_node
@@ -41,11 +32,8 @@ foreach(executable ${EXECUTABLES})
     rclcpp
     dynamixel_sdk
     dynamixel_sdk_custom_interfaces
+    dynamixel_rdk_msgs
   )
-  
-  # Add dependency on our own messages
-  rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
-  target_link_libraries(${executable} "${cpp_typesupport_target}")
 endforeach()
 
 install(TARGETS

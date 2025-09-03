@@ -8,22 +8,11 @@
 #include "dynamixel_rdk_ros2/motor_status.hpp"
 #include "dynamixel_rdk_ros2/motor_setting.hpp"
 
-// 내부 메시지 인클루드
-#include "dynamixel_rdk_ros2/msg/current_motor_status.hpp"
-#include "dynamixel_rdk_ros2/msg/warning_status.hpp"
-#include "dynamixel_rdk_ros2/msg/dynamixel_control_msgs.hpp"
-#include "dynamixel_rdk_ros2/msg/dynamixel_msgs.hpp"
-
-// dynamixel_rdk_msgs 네임스페이스 별칭 생성
-namespace dynamixel_rdk_msgs {
-namespace msg {
-  using CurrentMotorStatus = dynamixel_rdk_ros2::msg::CurrentMotorStatus;
-  using WarningStatus = dynamixel_rdk_ros2::msg::WarningStatus;
-  using DynamixelControlMsgs = dynamixel_rdk_ros2::msg::DynamixelControlMsgs;
-  using DynamixelMsgs = dynamixel_rdk_ros2::msg::DynamixelMsgs;
-}
-}
-
+// 외부 메시지 인클루드
+#include "dynamixel_rdk_msgs/msg/current_motor_status.hpp"
+#include "dynamixel_rdk_msgs/msg/warning_status.hpp"
+#include "dynamixel_rdk_msgs/msg/dynamixel_control_msgs.hpp"
+#include "dynamixel_rdk_msgs/msg/dynamixel_msgs.hpp"
 
 namespace dynamixel_rdk_ros2
 {
