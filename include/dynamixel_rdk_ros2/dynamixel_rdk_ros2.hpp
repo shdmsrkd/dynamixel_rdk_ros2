@@ -8,10 +8,21 @@
 #include "dynamixel_rdk_ros2/motor_status.hpp"
 #include "dynamixel_rdk_ros2/motor_setting.hpp"
 
+// 내부 메시지 인클루드
 #include "dynamixel_rdk_ros2/msg/current_motor_status.hpp"
 #include "dynamixel_rdk_ros2/msg/warning_status.hpp"
 #include "dynamixel_rdk_ros2/msg/dynamixel_control_msgs.hpp"
 #include "dynamixel_rdk_ros2/msg/dynamixel_msgs.hpp"
+
+// dynamixel_rdk_msgs 네임스페이스 별칭 생성
+namespace dynamixel_rdk_msgs {
+namespace msg {
+  using CurrentMotorStatus = dynamixel_rdk_ros2::msg::CurrentMotorStatus;
+  using WarningStatus = dynamixel_rdk_ros2::msg::WarningStatus;
+  using DynamixelControlMsgs = dynamixel_rdk_ros2::msg::DynamixelControlMsgs;
+  using DynamixelMsgs = dynamixel_rdk_ros2::msg::DynamixelMsgs;
+}
+}
 
 
 namespace dynamixel_rdk_ros2
@@ -63,11 +74,11 @@ namespace dynamixel_rdk_ros2
     std::unique_ptr<MotorSetting> motor_setting_handler_;
 
     // Publisher들
-    rclcpp::Publisher<::dynamixel_rdk_ros2::msg::CurrentMotorStatus>::SharedPtr motor_status_pubisher_;
-    rclcpp::Publisher<::dynamixel_rdk_ros2::msg::WarningStatus>::SharedPtr warning_status_publisher_;
+    rclcpp::Publisher<dynamixel_rdk_msgs::msg::CurrentMotorStatus>::SharedPtr motor_status_pubisher_;
+    rclcpp::Publisher<dynamixel_rdk_msgs::msg::WarningStatus>::SharedPtr warning_status_publisher_;
 
     // Subscriber들
-    rclcpp::Subscription<::dynamixel_rdk_ros2::msg::DynamixelControlMsgs>::SharedPtr ik2rdk_sub;
+    rclcpp::Subscription<dynamixel_rdk_msgs::msg::DynamixelControlMsgs>::SharedPtr ik2rdk_sub;
 
     // Timer
     rclcpp::TimerBase::SharedPtr getting_timer_;
@@ -76,10 +87,10 @@ namespace dynamixel_rdk_ros2
     std::vector<MotorStatus::MotorStatusConfig> motor_status;
     // 콜백 및 유틸리티 함수들
     void timer_callback();
-    void dynamixel_control_callback(const ::dynamixel_rdk_ros2::msg::DynamixelControlMsgs & msg);
+    void dynamixel_control_callback(const dynamixel_rdk_msgs::msg::DynamixelControlMsgs & msg);
     void dxl_variable_init();
-    void ResizeMsg(::dynamixel_rdk_ros2::msg::CurrentMotorStatus &msg, size_t size);
-    void msgUpdate(::dynamixel_rdk_ros2::msg::CurrentMotorStatus &msg, size_t index,
+    void ResizeMsg(dynamixel_rdk_msgs::msg::CurrentMotorStatus &msg, size_t size);
+    void msgUpdate(dynamixel_rdk_msgs::msg::CurrentMotorStatus &msg, size_t index,
                    uint32_t position, uint8_t velocity, uint16_t voltage,
                    uint8_t temperature, uint16_t torque, uint8_t moving_status, uint8_t error_status);
 

@@ -8,12 +8,12 @@ namespace dynamixel_rdk_ros2
 {
 dynamixel_rdk_ros2::dynamixel_rdk_ros2() : Node("dynamixel_rdk_ros2")
 {
-  // 자체 메시지를 사용한 Publisher 초기화
-  motor_status_pubisher_ = this->create_publisher<::dynamixel_rdk_ros2::msg::CurrentMotorStatus>("motor_status", 200);
-  warning_status_publisher_ = this->create_publisher<::dynamixel_rdk_ros2::msg::WarningStatus>("motor_warning", 200);
+  // Publisher
+  motor_status_pubisher_ = this->create_publisher<dynamixel_rdk_msgs::msg::CurrentMotorStatus>("motor_status", 200);
+  warning_status_publisher_ = this->create_publisher<dynamixel_rdk_msgs::msg::WarningStatus>("motor_warning", 200);
 
-  // 자체 메시지를 사용한 Subscription 초기화
-  ik2rdk_sub = create_subscription<::dynamixel_rdk_ros2::msg::DynamixelControlMsgs>("dynamixel_control", 10, std::bind(&dynamixel_rdk_ros2::dynamixel_control_callback, this, std::placeholders::_1));
+  // Subscription
+  ik2rdk_sub = create_subscription<dynamixel_rdk_msgs::msg::DynamixelControlMsgs>("dynamixel_control", 10, std::bind(&dynamixel_rdk_ros2::dynamixel_control_callback, this, std::placeholders::_1));
 
   if(start())
   {
@@ -61,7 +61,7 @@ bool dynamixel_rdk_ros2::start()
   // DefaultSettingChange(VELOCITY_LIMIT_CASE, max_velocity_limits)s;
   // DefaultSettingChange(TEMPERATURE_LIMIT_CASE, temperature_limits);
 
-  // 충분한 크기로 motor_status 초기화
+  // motor_status 초기화
   motor_status.clear();
   motor_status.resize(std::max(TOTAL_MOTOR + 2, static_cast<int>(motor_ids_.size())));
 
@@ -151,7 +151,7 @@ bool dynamixel_rdk_ros2::start()
 
   bool dynamixel_rdk_ros2::motorCheck()
   {
-    ::dynamixel_rdk_ros2::msg::WarningStatus msg;
+    dynamixel_rdk_msgs::msg::WarningStatus msg;
 
     connected_motor_ids_.clear();
     disconnected_motor_ids_.clear();
@@ -222,7 +222,7 @@ void dynamixel_rdk_ros2::timer_callback()
   motorCheck(); // 연결 상태 확인
 
   MotorStatus::MotorStatusConfig status;
-  ::dynamixel_rdk_ros2::msg::CurrentMotorStatus msg;
+  dynamixel_rdk_msgs::msg::CurrentMotorStatus msg;
   const size_t TOTAL_CONNECT_MOTORS = connected_motor_ids_.size();
 
   // 연결된 모터가 없으면 리턴
@@ -245,7 +245,7 @@ void dynamixel_rdk_ros2::timer_callback()
     connected_motor_uint8_ids.push_back(static_cast<uint8_t>(id));
   }
 
-  // 동기 읽기 시도
+  // Synchronous read 실패시 개별로 읽음
   bool sync_success = false;
   try {
     sync_success =
@@ -302,10 +302,10 @@ void dynamixel_rdk_ros2::timer_callback()
   RCLCPP_INFO(this->get_logger(), "모터 총 개수 : %zu", motor_ids_.size());
   RCLCPP_INFO(this->get_logger(), "총 연결된 모터 개수 : %zu", TOTAL_CONNECT_MOTORS);
 
-  
+
   motor_status_pubisher_->publish(msg);
 }
-  void dynamixel_rdk_ros2::dynamixel_control_callback(const ::dynamixel_rdk_ros2::msg::DynamixelControlMsgs &msg)
+  void dynamixel_rdk_ros2::dynamixel_control_callback(const dynamixel_rdk_msgs::msg::DynamixelControlMsgs &msg)
   {
     RCLCPP_INFO(this->get_logger(), "==========================================================");
 
@@ -320,7 +320,6 @@ void dynamixel_rdk_ros2::timer_callback()
       goal_accelerations.push_back(motor_control.profile_acceleration);
     }
 
-    // 상하체로 나누어 패킷 전송
     std::vector<uint8_t> lower_body_ids;
     std::vector<double> lower_body_positions;
     std::vector<double> lower_body_velocities;
@@ -372,7 +371,7 @@ void dynamixel_rdk_ros2::timer_callback()
     dxl_comm_result = COMM_TX_FAIL;
   }
 
-  void dynamixel_rdk_ros2::ResizeMsg(::dynamixel_rdk_ros2::msg::CurrentMotorStatus &msg, size_t size)
+  void dynamixel_rdk_ros2::ResizeMsg(dynamixel_rdk_msgs::msg::CurrentMotorStatus &msg, size_t size)
   {
     msg.position.resize(size);
     msg.goal_position.resize(size);
@@ -384,7 +383,7 @@ void dynamixel_rdk_ros2::timer_callback()
     msg.error_status.resize(size);
   }
 
-  void dynamixel_rdk_ros2::msgUpdate(::dynamixel_rdk_ros2::msg::CurrentMotorStatus &msg,
+  void dynamixel_rdk_ros2::msgUpdate(dynamixel_rdk_msgs::msg::CurrentMotorStatus &msg,
                                      size_t index,
                                      uint32_t position, uint8_t velocity, uint16_t voltage,
                                      uint8_t temperature, uint16_t torque, uint8_t moving_status, uint8_t error_status)

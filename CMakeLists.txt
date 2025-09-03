@@ -14,10 +14,10 @@ find_package(rosidl_default_generators REQUIRED)
 
 # Generate messages
 rosidl_generate_interfaces(${PROJECT_NAME}
-  "msg/CurrentMotorStatus.msg"
-  "msg/DynamixelControlMsgs.msg"
-  "msg/DynamixelMsgs.msg"
-  "msg/WarningStatus.msg"
+  "dynamixel_rdk_msgs/msg/CurrentMotorStatus.msg"
+  "dynamixel_rdk_msgs/msg/DynamixelControlMsgs.msg"
+  "dynamixel_rdk_msgs/msg/DynamixelMsgs.msg"
+  "dynamixel_rdk_msgs/msg/WarningStatus.msg"
   DEPENDENCIES std_msgs
 )
 
@@ -43,7 +43,7 @@ foreach(executable ${EXECUTABLES})
     dynamixel_sdk_custom_interfaces
   )
   
-  # Add dependency on our own messages (새로운 방식)
+  # Add dependency on our own messages
   rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
   target_link_libraries(${executable} "${cpp_typesupport_target}")
 endforeach()
