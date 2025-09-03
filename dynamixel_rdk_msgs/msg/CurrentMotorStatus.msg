@@ -1,0 +1,9 @@
+# Messages
+float64[] position
+uint32[] goal_position
+uint8[] velocity
+uint8[] temperature
+uint16[] torque
+uint16[] input_voltage
+uint8[] moving_status
+uint8[] error_status
