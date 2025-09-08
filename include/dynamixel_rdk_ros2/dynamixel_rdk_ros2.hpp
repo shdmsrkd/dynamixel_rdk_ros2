@@ -68,6 +68,7 @@ namespace dynamixel_rdk_ros2
 
     // Subscriber들
     rclcpp::Subscription<dynamixel_rdk_msgs::msg::DynamixelControlMsgs>::SharedPtr ik2rdk_sub;
+    rclcpp::Subscription<dynamixel_rdk_msgs::msg::DynamixelMsgs>::SharedPtr pantilt_sub_;
 
     // Timer
     rclcpp::TimerBase::SharedPtr getting_timer_;
@@ -77,10 +78,11 @@ namespace dynamixel_rdk_ros2
     // 콜백 및 유틸리티 함수들
     void timer_callback();
     void dynamixel_control_callback(const dynamixel_rdk_msgs::msg::DynamixelControlMsgs & msg);
+    void dynamixel_callback(const dynamixel_rdk_msgs::msg::DynamixelMsgs &msg);
     void dxl_variable_init();
     void ResizeMsg(dynamixel_rdk_msgs::msg::CurrentMotorStatus &msg, size_t size);
     void msgUpdate(dynamixel_rdk_msgs::msg::CurrentMotorStatus &msg, size_t index,
-                   uint32_t position, uint8_t velocity, uint16_t voltage,
+                   uint32_t position, uint32_t goal_position, uint8_t velocity, uint16_t voltage,
                    uint8_t temperature, uint16_t torque, uint8_t moving_status, uint8_t error_status);
 
     int32_t radianToTick(double rad);

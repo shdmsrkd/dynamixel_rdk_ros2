@@ -283,6 +283,7 @@ namespace dynamixel_rdk_ros2
     return true;
   }
 
+
   template <typename T>
   bool MotorSetting::TxRx(uint8_t id, const std::pair<int, int> &control_table_address, T &value, const std::string &status_name, int mode)
   {
