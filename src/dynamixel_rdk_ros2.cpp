@@ -18,9 +18,8 @@ dynamixel_rdk_ros2::dynamixel_rdk_ros2() : Node("dynamixel_rdk_ros2")
   if(start())
   {
     RCLCPP_INFO(this->get_logger(), "!!!!!!!!!!! 초기 설정 성공 !!!!!!!!!!!");
-    // 분할 읽기로 최적화했으므로 더 짧은 주기 사용 가능 (1초)
-    getting_timer_ = this->create_wall_timer(std::chrono::milliseconds(1000),
-                    std::bind(&dynamixel_rdk_ros2::timer_callback, this));
+    // getting_timer_ = this->create_wall_timer(std::chrono::milliseconds(1000),
+    //                 std::bind(&dynamixel_rdk_ros2::timer_callback, this));
   }
   else
   { RCLCPP_ERROR(this->get_logger(), "!!!!!!!!!!! 초기 설정 실패 !!!!!!!!!!!"); }
@@ -68,7 +67,7 @@ bool dynamixel_rdk_ros2::start()
   void dynamixel_rdk_ros2::initParameters()
   {
     // 파라미터 선언
-    this->declare_parameter("device_port", "/dev/ttyUSB0");
+    this->declare_parameter("device_port", "/dev/ttyUSB-U2D2");
     this->declare_parameter("baud_rate", 1000000);
     this->declare_parameter("protocol_version", 2.0);
     this->declare_parameter("ids", std::vector<int64_t>{1, 2, 3, 4, 5, 6, 7, 8, 9, 10});
@@ -365,7 +364,7 @@ void dynamixel_rdk_ros2::timer_callback()
     }
 
     uint8_t pan_motor_id = 23;
-    double goal_position = msg.goal_position;
+    double goal_position = msg.goal_position * M_PI / 180;
 
     uint32_t position_value = static_cast<uint32_t>((goal_position + M_PI) * (4095.0 / (2 * M_PI)));
     motor_setting_handler_->setGoalPosition(pan_motor_id, position_value);
