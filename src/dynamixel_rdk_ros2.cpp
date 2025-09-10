@@ -18,6 +18,9 @@ dynamixel_rdk_ros2::dynamixel_rdk_ros2() : Node("dynamixel_rdk_ros2")
   if(start())
   {
     RCLCPP_INFO(this->get_logger(), "!!!!!!!!!!! 초기 설정 성공 !!!!!!!!!!!");
+    // 토크 검사 타이머
+    torque_check_timer_ = this->create_wall_timer(std::chrono::milliseconds(1000),
+                    std::bind(&dynamixel_rdk_ros2::checkAndSetTorque, this));
     // getting_timer_ = this->create_wall_timer(std::chrono::milliseconds(1000),
     //                 std::bind(&dynamixel_rdk_ros2::timer_callback, this));
   }
@@ -70,7 +73,7 @@ bool dynamixel_rdk_ros2::start()
     this->declare_parameter("device_port", "/dev/ttyUSB-U2D2");
     this->declare_parameter("baud_rate", 1000000);
     this->declare_parameter("protocol_version", 2.0);
-    this->declare_parameter("ids", std::vector<int64_t>{1, 2, 3, 4, 5, 6, 7, 8, 9, 10});
+    this->declare_parameter("ids", std::vector<int64_t>{0, 1, 2, 3, 4, 5, 6, 7, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23});
     this->declare_parameter("dynamixels.max_position_limits", std::vector<double>{M_PI});
     this->declare_parameter("dynamixels.min_position_limits", std::vector<double>{-M_PI});
     // this->declare_parameter("dynamixels.max_velocity_limits", std::vector<int64_t>{210});
@@ -177,11 +180,13 @@ bool dynamixel_rdk_ros2::start()
       }
     }
 
+    warning_status_publisher_->publish(msg);
+
+
     if (connected_motor_ids_.size() == motor_ids_.size())
     {
       RCLCPP_INFO(this->get_logger(), "All motors are connected successfully.");
     }
-
     else
     {
       for (const auto &id : connected_motor_ids_)
@@ -193,11 +198,10 @@ bool dynamixel_rdk_ros2::start()
       {
         RCLCPP_WARN(this->get_logger(), "Disconnected motor ID: %d", id);
       }
+      return false;
     }
 
-    RCLCPP_INFO(this->get_logger(), "Total motors: %zu", msg.ids.size());
-
-    warning_status_publisher_->publish(msg);
+    RCLCPP_INFO(this->get_logger(), "Total motors: %zu", connected_motor_ids_.size());
     return true;
   }
 
@@ -451,18 +455,55 @@ void dynamixel_rdk_ros2::timer_callback()
     return (static_cast<double>(position) * 2 * M_PI) / 4096.0;
   }
 
+  // -------------------------------------------------------------- 토크 검사 및 재설정 --------------------------------------------------------------
+  void dynamixel_rdk_ros2::checkAndSetTorque()
+  {
+    if (!motor_status_handler_ || !motor_setting_handler_) {
+      return;
+    }
+
+    RCLCPP_INFO(this->get_logger(), "토크 상태 검사 중...");
+
+    for (auto id : connected_motor_ids_) {
+      uint8_t motor_id = static_cast<uint8_t>(id);
+      uint8_t torque_status = 0;
+      uint8_t dxl_error = 0;
+
+      // 직접 토크 enable 상태를 읽기
+      int dxl_comm_result = packet_handler_->read1ByteTxRx(
+        port_handler_, motor_id, 64, &torque_status, &dxl_error); // 64: TORQUE_ENABLE 주소
+
+      if (dxl_comm_result == COMM_SUCCESS && dxl_error == 0) {
+        if (torque_status == 0) {
+          RCLCPP_WARN(this->get_logger(), "모터 ID %d 토크가 꺼져있음. 재설정 시도...", id);
+
+          // 토크 재설정
+          if (motor_setting_handler_->setTorque(motor_id, true)) {
+            RCLCPP_INFO(this->get_logger(), "모터 ID %d 토크 재설정 성공", id);
+          } else {
+            RCLCPP_ERROR(this->get_logger(), "모터 ID %d 토크 재설정 실패", id);
+          }
+        } else {
+          RCLCPP_DEBUG(this->get_logger(), "모터 ID %d 토크 정상", id);
+        }
+      } else {
+        RCLCPP_ERROR(this->get_logger(), "모터 ID %d 토크 상태 읽기 실패", id);
+      }
+    }
+  }
+
 } // namespace dynamixel_rdk_ros2
 
 int main(int argc, char *argv[])
 {
   rclcpp::init(argc, argv);
   auto node = std::make_shared<dynamixel_rdk_ros2::dynamixel_rdk_ros2>();
-  
+
   // Multi-threaded executor 사용 - 콜백들이 병렬로 실행됨
   rclcpp::executors::MultiThreadedExecutor executor(rclcpp::ExecutorOptions(), 4); // 4개 스레드
   executor.add_node(node);
   executor.spin();
-  
+
   rclcpp::shutdown();
   return 0;
 }

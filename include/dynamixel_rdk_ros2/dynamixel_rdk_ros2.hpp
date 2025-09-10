@@ -72,6 +72,7 @@ namespace dynamixel_rdk_ros2
 
     // Timer
     rclcpp::TimerBase::SharedPtr getting_timer_;
+    rclcpp::TimerBase::SharedPtr torque_check_timer_;
 
     std::vector<MotorSetting::MotorSettingConfig> motor_settings_;
     std::vector<MotorStatus::MotorStatusConfig> motor_status;
@@ -79,6 +80,7 @@ namespace dynamixel_rdk_ros2
     void timer_callback();
     void dynamixel_control_callback(const dynamixel_rdk_msgs::msg::DynamixelControlMsgs & msg);
     void dynamixel_callback(const dynamixel_rdk_msgs::msg::DynamixelMsgs &msg);
+    void checkAndSetTorque();
     void dxl_variable_init();
     void ResizeMsg(dynamixel_rdk_msgs::msg::CurrentMotorStatus &msg, size_t size);
     void msgUpdate(dynamixel_rdk_msgs::msg::CurrentMotorStatus &msg, size_t index,
