@@ -19,8 +19,8 @@ dynamixel_rdk_ros2::dynamixel_rdk_ros2() : Node("dynamixel_rdk_ros2")
   {
     RCLCPP_INFO(this->get_logger(), "!!!!!!!!!!! 초기 설정 성공 !!!!!!!!!!!");
     // 토크 검사 타이머
-    torque_check_timer_ = this->create_wall_timer(std::chrono::milliseconds(1000),
-                    std::bind(&dynamixel_rdk_ros2::checkAndSetTorque, this));
+    // torque_check_timer_ = this->create_wall_timer(std::chrono::milliseconds(1000),
+    //                 std::bind(&dynamixel_rdk_ros2::checkAndSetTorque, this));
     // getting_timer_ = this->create_wall_timer(std::chrono::milliseconds(1000),
     //                 std::bind(&dynamixel_rdk_ros2::timer_callback, this));
   }
