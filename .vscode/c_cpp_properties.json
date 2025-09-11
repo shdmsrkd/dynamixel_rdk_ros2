@@ -4,6 +4,9 @@
             "name": "Linux",
             "includePath": [
                 "${workspaceFolder}/**",
+                "/usr/include/c++/11/**",
+                "/usr/include/x86_64-linux-gnu/c++/11/**",
+                "/usr/include/**",
                 "/opt/ros/humble/include/**",
                 "/home/ek/ros2_ws/install/*/include/**",
                 "/home/ek/ros2_ws/src/*/include/**",

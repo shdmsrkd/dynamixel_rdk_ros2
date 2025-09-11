@@ -27,6 +27,43 @@ namespace dynamixel_rdk_ros2
   { return TxRx(id, MXRAM::GOAL_CURRENT, current, "Goal Current", WRITE); }
 
 
+  /*=================================================== MOTOR CONTROL SETTER(Sync) ===================================================*/
+  bool MotorSetting::setTorqueSync(const std::vector<uint8_t>& motor_ids, bool enable)
+  {
+    RCLCPP_INFO(logger_, "[SyncWrite] 토크 설정 시작 - 모터 개수: %zu, 토크: %s", 
+                motor_ids.size(), enable ? "ON" : "OFF");
+
+    dynamixel::GroupSyncWrite syncWrite(port_handler_, packet_handler_, 
+                                        MXRAM::TORQUE_ENABLE.first, MXRAM::TORQUE_ENABLE.second);
+
+    uint8_t torque_value = enable ? 1 : 0;
+    
+    for (size_t i = 0; i < motor_ids.size(); i++)
+    {
+      std::vector<uint8_t> data(1);
+      data[0] = torque_value;
+      
+      bool dxl_addparam_result = syncWrite.addParam(motor_ids[i], data.data());
+      if (!dxl_addparam_result)
+      {
+        RCLCPP_ERROR(logger_, "[SyncWrite] 토크 파라미터 추가 실패 - ID: %d", motor_ids[i]);
+        return false;
+      }
+      RCLCPP_INFO(logger_, "[SyncWrite] 토크 파라미터 추가 - ID: %d, 값: %d", motor_ids[i], torque_value);
+    }
+
+    int dxl_comm_result = syncWrite.txPacket();
+    if (dxl_comm_result != COMM_SUCCESS)
+    {
+      RCLCPP_ERROR(logger_, "[SyncWrite] 토크 설정 실패: %s", packet_handler_->getTxRxResult(dxl_comm_result));
+      return false;
+    }
+
+    RCLCPP_INFO(logger_, "[SyncWrite] 토크 설정 성공 - 모든 모터 토크 %s", enable ? "ON" : "OFF");
+    return true;
+  }
+
+
   /*=================================================== MOTOR OPERATING MODE SETTER(Individual) ===================================================*/
     bool MotorSetting::setOperatingMode(uint8_t id, uint8_t mode)
   { return TxRx(id, EEPROM::OPERATING_MODE, mode, "Operating Mode", WRITE); }

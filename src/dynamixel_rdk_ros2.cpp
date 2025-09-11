@@ -53,7 +53,16 @@ bool dynamixel_rdk_ros2::start()
     return false;
   }
 
-  for (auto id : motor_ids_) { setTorque(id, TORQUEON); }
+  std::vector<uint8_t> motor_ids_uint8;
+  for (auto id : motor_ids_) {
+    motor_ids_uint8.push_back(static_cast<uint8_t>(id));
+  }
+
+  if (!motor_setting_handler_->setTorqueSync(motor_ids_uint8, true))
+  {
+    RCLCPP_ERROR(this->get_logger(), "SyncWrite 토크 설정 실패!");
+    return false;
+  }
 
   // 모터 기본값 설정
   // DefaultSettingChange(MAX_POSITION_LIMIT_CASE, max_position_limits_);
@@ -70,7 +79,7 @@ bool dynamixel_rdk_ros2::start()
   void dynamixel_rdk_ros2::initParameters()
   {
     // 파라미터 선언
-    this->declare_parameter("device_port", "/dev/ttyUSB-U2D2");
+    this->declare_parameter("device_port", "/dev/ttyUSB0");
     this->declare_parameter("baud_rate", 1000000);
     this->declare_parameter("protocol_version", 2.0);
     this->declare_parameter("ids", std::vector<int64_t>{0, 1, 2, 3, 4, 5, 6, 7, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23});

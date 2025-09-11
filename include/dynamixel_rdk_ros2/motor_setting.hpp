@@ -35,6 +35,9 @@ namespace dynamixel_rdk_ros2
     bool setGoalPosition(uint8_t id, uint32_t position);
     bool setGoalCurrent(uint8_t id, uint16_t current);
 
+    // 모터 설정 함수들 (Sync)
+    bool setTorqueSync(const std::vector<uint8_t>& motor_ids, bool enable);
+
     // 모터 제한값 설정 함수들 (Individual)
     bool setMinPositionLimit(uint8_t id, uint32_t limit);
     bool setMaxPositionLimit(uint8_t id, uint32_t limit);
