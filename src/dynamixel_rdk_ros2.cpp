@@ -17,7 +17,7 @@ dynamixel_rdk_ros2::dynamixel_rdk_ros2() : Node("dynamixel_rdk_ros2")
   pantilt_sub_ = create_subscription<dynamixel_rdk_msgs::msg::DynamixelMsgs>("pan_dxl", 10, std::bind(&dynamixel_rdk_ros2::dynamixel_callback, this, std::placeholders::_1));
   if(start())
   {
-    RCLCPP_INFO(this->get_logger(), "!!!!!!!!!!! 초기 설정 성공 !!!!!!!!!!!");
+    RCLCPP_INFO(this->get_logger(), "!!!!!!!!!!! Initial Setup Successful !!!!!!!!!!!");
     // 토크 검사 타이머
     // torque_check_timer_ = this->create_wall_timer(std::chrono::milliseconds(1000),
     //                 std::bind(&dynamixel_rdk_ros2::checkAndSetTorque, this));
@@ -25,23 +25,24 @@ dynamixel_rdk_ros2::dynamixel_rdk_ros2() : Node("dynamixel_rdk_ros2")
     //                 std::bind(&dynamixel_rdk_ros2::timer_callback, this));
   }
   else
-  { RCLCPP_ERROR(this->get_logger(), "!!!!!!!!!!! 초기 설정 실패 !!!!!!!!!!!"); }
+  {
+    RCLCPP_ERROR(this->get_logger(), "!!!!!!!!!!! Initial Setup Failed !!!!!!!!!!!");
+    if (port_handler_) { port_handler_->closePort(); }
+    rclcpp::shutdown();
+  }
 }
 
 
-  dynamixel_rdk_ros2::~dynamixel_rdk_ros2()
+dynamixel_rdk_ros2::~dynamixel_rdk_ros2()
+{
+  if (port_handler_)
   {
-    if (port_handler_)
-    {
-      port_handler_->closePort();
-      delete port_handler_;
-    }
-    if (packet_handler_)
-    {
-      delete packet_handler_;
-    }
-    RCLCPP_INFO(rclcpp::get_logger("dynamixel_rdk_ros2"), "Dynamixel RDK ROS2 Node Shutdown");
+    port_handler_->closePort();
+    delete port_handler_;
   }
+
+  RCLCPP_INFO(rclcpp::get_logger("dynamixel_rdk_ros2"), "Dynamixel RDK ROS2 Node Shutdown");
+}
 
 bool dynamixel_rdk_ros2::start()
 {
@@ -132,7 +133,7 @@ bool dynamixel_rdk_ros2::start()
       return false;
     }
 
-    motorCheck();
+    if(!motorCheck()) {return false;}
 
     motor_status_handler_ = std::make_unique<MotorStatus>(
         port_handler_, packet_handler_, this->get_logger());
@@ -165,15 +166,9 @@ bool dynamixel_rdk_ros2::start()
     connected_motor_ids_.clear();
     disconnected_motor_ids_.clear();
 
-    if (motor_ids_.empty())
-    {
-      return false;
-    }
+    if (motor_ids_.empty()) { return false; }
 
-    for (const auto &id : motor_ids_)
-    {
-      msg.ids.push_back(id);
-    }
+    for (const auto &id : motor_ids_) { msg.ids.push_back(id); }
 
     for (const auto &id : motor_ids_)
     {
@@ -198,15 +193,8 @@ bool dynamixel_rdk_ros2::start()
     }
     else
     {
-      for (const auto &id : connected_motor_ids_)
-      {
-        RCLCPP_INFO(this->get_logger(), "Connected motor ID: %d", id);
-      }
-
-      for (const auto &id : disconnected_motor_ids_)
-      {
-        RCLCPP_WARN(this->get_logger(), "Disconnected motor ID: %d", id);
-      }
+      for (const auto &id : connected_motor_ids_) { RCLCPP_INFO(this->get_logger(), "Connected motor ID: %d", id); }
+      for (const auto &id : disconnected_motor_ids_) { RCLCPP_WARN(this->get_logger(), "Disconnected motor ID: %d", id); }
       return false;
     }
 
@@ -214,10 +202,7 @@ bool dynamixel_rdk_ros2::start()
     return true;
   }
 
-  bool dynamixel_rdk_ros2::setTorque(uint8_t id, bool enable)
-  {
-    return motor_setting_handler_->setTorque(id, enable);
-  }
+  bool dynamixel_rdk_ros2::setTorque(uint8_t id, bool enable) { return motor_setting_handler_->setTorque(id, enable); }
 
   // -------------------------------------------------------------- Timer Callback --------------------------------------------------------------
   // getting and publishing motor status
@@ -506,12 +491,18 @@ void dynamixel_rdk_ros2::timer_callback()
 int main(int argc, char *argv[])
 {
   rclcpp::init(argc, argv);
-  auto node = std::make_shared<dynamixel_rdk_ros2::dynamixel_rdk_ros2>();
+  try
+  {
+    auto node = std::make_shared<dynamixel_rdk_ros2::dynamixel_rdk_ros2>();
 
-  // Multi-threaded executor 사용 - 콜백들이 병렬로 실행됨
-  rclcpp::executors::MultiThreadedExecutor executor(rclcpp::ExecutorOptions(), 4); // 4개 스레드
-  executor.add_node(node);
-  executor.spin();
+    rclcpp::executors::MultiThreadedExecutor executor(rclcpp::ExecutorOptions(), 4); // 4개 스레드
+
+    executor.add_node(node);
+    executor.spin();
+
+  } catch (const std::exception &e) {
+      RCLCPP_ERROR(rclcpp::get_logger("main"), "Exception caught: %s", e.what());
+  }
 
   rclcpp::shutdown();
   return 0;

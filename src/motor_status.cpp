@@ -73,47 +73,36 @@ namespace dynamixel_rdk_ros2
     {
         dxl_variable_init();
 
-        // RCLCPP_INFO(logger_, "[TxRx READ] 시작 - ID: %d, 주소: %d, 크기: %d, 작업: %s", 
-        //             id, control_table_address.first, control_table_address.second, status_name.c_str());
-
         if (mode == READ)
         {
             if constexpr (sizeof(T) == 1)
             {
-                // RCLCPP_INFO(logger_, "[TxRx READ] 1바이트 읽기 시도 - ID: %d, 주소: %d", id, control_table_address.first);
                 dxl_comm_result_ = packet_handler_->read1ByteTxRx(port_handler_, id, control_table_address.first, reinterpret_cast<uint8_t *>(&value), &dxl_error_);
             }
             else if constexpr (sizeof(T) == 2)
             {
-                // RCLCPP_INFO(logger_, "[TxRx READ] 2바이트 읽기 시도 - ID: %d, 주소: %d", id, control_table_address.first);
                 dxl_comm_result_ = packet_handler_->read2ByteTxRx(port_handler_, id, control_table_address.first, reinterpret_cast<uint16_t *>(&value), &dxl_error_);
             }
             else if constexpr (sizeof(T) == 4)
             {
-                // RCLCPP_INFO(logger_, "[TxRx READ] 4바이트 읽기 시도 - ID: %d, 주소: %d", id, control_table_address.first);
                 dxl_comm_result_ = packet_handler_->read4ByteTxRx(port_handler_, id, control_table_address.first, reinterpret_cast<uint32_t *>(&value), &dxl_error_);
             }
             else
             {
-                // RCLCPP_ERROR(logger_, "[TxRx READ] 지원하지 않는 데이터 크기 - %s, 크기: %zu", status_name.c_str(), sizeof(T));
                 return false;
             }
-
-            // RCLCPP_INFO(logger_, "[TxRx READ] 통신 결과 - ID: %d, 결과: %d, 에러: %d, 읽은값: %d", id, dxl_comm_result_, dxl_error_, static_cast<int>(value));            
-            
             if (dxl_comm_result_ != COMM_SUCCESS)
             {
-                // RCLCPP_ERROR(logger_, "[TxRx READ] 통신 실패 - %s for ID %d: %s (코드: %d)", status_name.c_str(), id, packet_handler_->getTxRxResult(dxl_comm_result_), dxl_comm_result_);
                 return false;
             }
 
             if (dxl_error_ != 0)
             {
-                // RCLCPP_ERROR(logger_, "[TxRx READ] 다이나믹셀 에러 - %s for ID %d: %s (코드: %d)", status_name.c_str(), id, packet_handler_->getRxPacketError(dxl_error_), dxl_error_);
+                RCLCPP_ERROR(logger_, "[TxRx READ] 다이나믹셀 에러 - %s for ID %d: %s (코드: %d)", status_name.c_str(), id, packet_handler_->getRxPacketError(dxl_error_), dxl_error_);
                 return false;
             }
 
-            // RCLCPP_INFO(logger_, "[TxRx READ] 성공 - ID %d %s: %d", id, status_name.c_str(), static_cast<int>(value));
+            RCLCPP_INFO(logger_, "[TxRx READ] 성공 - ID %d %s: %d", id, status_name.c_str(), static_cast<int>(value));
             return true;
         }
 
