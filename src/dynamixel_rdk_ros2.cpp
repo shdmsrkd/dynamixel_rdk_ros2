@@ -334,7 +334,7 @@ void dynamixel_rdk_ros2::timer_callback()
     RCLCPP_INFO(this->get_logger(), "==========================================================");
 
     // Validate input sizes
-    if (msg.motor_control.size() < motor_ids_.size())
+    if (msg.motor_control.size() < motor_ids_.size() - 1)
     {
       RCLCPP_ERROR(this->get_logger(), "motor_control size(%zu) < motor_ids size(%zu). Skip sending.",
                    msg.motor_control.size(), motor_ids_.size());
@@ -347,7 +347,7 @@ void dynamixel_rdk_ros2::timer_callback()
     }
 
     // Build one combined packet for all motors
-    const size_t N = motor_ids_.size();
+    const size_t N = motor_ids_.size() - 1;
     std::vector<uint8_t> all_ids; all_ids.reserve(N);
     std::vector<double> goal_positions; goal_positions.reserve(N);
     std::vector<double> goal_velocities; goal_velocities.reserve(N);

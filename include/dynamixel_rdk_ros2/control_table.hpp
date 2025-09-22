@@ -27,6 +27,8 @@ namespace dynamixel_rdk_ros2
 #define MX_ACC_PROFILE 214.577   // [rev/min^2]
 #define MX_CURRENT_PROFILE 3.36  // [mA]
 
+#define RADIAN_TO_TICK 83.7657595
+
 #define MIN_POSITION_LIMIT_CASE 0
 #define MAX_POSITION_LIMIT_CASE 1
 #define VELOCITY_LIMIT_CASE 2
