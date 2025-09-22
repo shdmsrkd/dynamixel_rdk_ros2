@@ -79,7 +79,7 @@ bool dynamixel_rdk_ros2::start()
   void dynamixel_rdk_ros2::initParameters()
   {
     // 파라미터 선언
-    this->declare_parameter("device_port", "/dev/ttyUSB0");
+    this->declare_parameter("device_port", "/dev/ttyUSB-U2D2");
     this->declare_parameter("baud_rate", 1000000);
     this->declare_parameter("protocol_version", 2.0);
     this->declare_parameter("ids", std::vector<int64_t>{0, 1, 2, 3, 4, 5, 6, 7, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23});
