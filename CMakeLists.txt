@@ -9,7 +9,6 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(dynamixel_sdk REQUIRED)
-find_package(dynamixel_sdk_custom_interfaces REQUIRED)
 find_package(dynamixel_rdk_msgs REQUIRED)
 
 set(EXECUTABLES
@@ -31,7 +30,6 @@ foreach(executable ${EXECUTABLES})
   ament_target_dependencies(${executable}
     rclcpp
     dynamixel_sdk
-    dynamixel_sdk_custom_interfaces
     dynamixel_rdk_msgs
   )
 endforeach()
