@@ -98,11 +98,9 @@ namespace dynamixel_rdk_ros2
 
             if (dxl_error_ != 0)
             {
-                RCLCPP_ERROR(logger_, "[TxRx READ] 다이나믹셀 에러 - %s for ID %d: %s (코드: %d)", status_name.c_str(), id, packet_handler_->getRxPacketError(dxl_error_), dxl_error_);
                 return false;
             }
 
-            RCLCPP_INFO(logger_, "[TxRx READ] 성공 - ID %d %s: %d", id, status_name.c_str(), static_cast<int>(value));
             return true;
         }
 

@@ -17,8 +17,8 @@ dynamixel_rdk_ros2::dynamixel_rdk_ros2() : Node("dynamixel_rdk_ros2")
   pantilt_sub_ = create_subscription<dynamixel_rdk_msgs::msg::DynamixelMsgs>("pan_dxl", 10, std::bind(&dynamixel_rdk_ros2::dynamixel_callback, this, std::placeholders::_1));
   if(start())
   {
-    RCLCPP_INFO(this->get_logger(), "!!!!!!!!!!! Initial Setup Successful !!!!!!!!!!!");
-    // 토크 검사 타이머
+    RCLCPP_INFO(this->get_logger(), "!!!!!! Initial Setup Successful !!!!!!!!!!!");
+    // Torque check timer
     // torque_check_timer_ = this->create_wall_timer(std::chrono::milliseconds(1000),
     //                 std::bind(&dynamixel_rdk_ros2::checkAndSetTorque, this));
     // getting_timer_ = this->create_wall_timer(std::chrono::milliseconds(1000),
@@ -50,7 +50,7 @@ bool dynamixel_rdk_ros2::start()
 
   if (!initDynamixel())
   {
-    RCLCPP_ERROR(this->get_logger(), "Dynamixel 초기화 실패!");
+    RCLCPP_ERROR(this->get_logger(), "!!!!!!!!!!! Dynamixel initialization failed !!!!!!!!!!!");
     return false;
   }
 
@@ -61,7 +61,7 @@ bool dynamixel_rdk_ros2::start()
 
   if (!motor_setting_handler_->setTorqueSync(motor_ids_uint8, true))
   {
-    RCLCPP_ERROR(this->get_logger(), "SyncWrite 토크 설정 실패!");
+    RCLCPP_ERROR(this->get_logger(), "!!!!!!!!!!! SyncWrite torque setup failed !!!!!!!!!!!");
     return false;
   }
 
@@ -206,114 +206,114 @@ bool dynamixel_rdk_ros2::start()
 
   // -------------------------------------------------------------- Timer Callback --------------------------------------------------------------
   // getting and publishing motor status
-void dynamixel_rdk_ros2::timer_callback()
-{
-  // 핸들러 초기화 확인
-  if (!motor_status_handler_ || !port_handler_ || !packet_handler_) {
-    RCLCPP_ERROR(this->get_logger(), "모터 핸들러가 초기화되지 않았습니다!");
-    return;
-  }
-
-  static int read_cycle = 0;
-
-  MotorStatus::MotorStatusConfig status;
-  dynamixel_rdk_msgs::msg::CurrentMotorStatus msg;
-  const size_t TOTAL_CONNECT_MOTORS = connected_motor_ids_.size();
-
-  // 연결된 모터가 없으면 리턴
-  if (TOTAL_CONNECT_MOTORS == 0) {
-    RCLCPP_WARN(this->get_logger(), "연결된 모터가 없습니다");
-    return;
-  }
-
-  // motor_status 벡터 크기 확인 및 조정
-  if (motor_status.size() < TOTAL_CONNECT_MOTORS) {
-    motor_status.resize(TOTAL_CONNECT_MOTORS);
-  }
-
-  ResizeMsg(msg, TOTAL_CONNECT_MOTORS);
-
-  std::vector<uint8_t> connected_motor_uint8_ids;
-  for (auto id : connected_motor_ids_)
+  void dynamixel_rdk_ros2::timer_callback()
   {
-    connected_motor_uint8_ids.push_back(static_cast<uint8_t>(id));
-  }
-
-  //매번 모든 상태를 읽지 않고 번갈아가며 읽기
-  bool sync_success = false;
-  try {
-    if (read_cycle % 3 == 0) {
-      // 가장 중요한 위치와 목표위치만 읽기
-      sync_success =
-          motor_status_handler_->getCurrentPositionSync(connected_motor_uint8_ids, motor_status) &&
-          motor_status_handler_->getGoalPositionSync(connected_motor_uint8_ids, motor_status);
-      RCLCPP_DEBUG(this->get_logger(), "읽기 사이클 0: 위치 데이터");
-    } else if (read_cycle % 3 == 1) {
-      // 속도와 이동 상태 읽기
-      sync_success =
-          motor_status_handler_->getCurrentVelocitySync(connected_motor_uint8_ids, motor_status) &&
-          motor_status_handler_->getMovingStatusSync(connected_motor_uint8_ids, motor_status);
-      RCLCPP_DEBUG(this->get_logger(), "읽기 사이클 1: 속도/이동 데이터");
-    } else {
-      // 전압, 온도, 토크, 에러 상태 읽기
-      sync_success =
-          motor_status_handler_->getInputVoltageSync(connected_motor_uint8_ids, motor_status) &&
-          motor_status_handler_->getCurrentTemperatureSync(connected_motor_uint8_ids, motor_status) &&
-          motor_status_handler_->getCurrentTorqueSync(connected_motor_uint8_ids, motor_status) &&
-          motor_status_handler_->HardwareErrorStatusSync(connected_motor_uint8_ids, motor_status);
-      RCLCPP_DEBUG(this->get_logger(), "읽기 사이클 2: 전압/온도/토크/에러 데이터");
+    // 핸들러 초기화 확인
+    if (!motor_status_handler_ || !port_handler_ || !packet_handler_) {
+      RCLCPP_ERROR(this->get_logger(), "모터 핸들러가 초기화되지 않았습니다!");
+      return;
     }
-    read_cycle++;
-  }
-  catch (const std::exception& e) {
-    RCLCPP_ERROR(this->get_logger(), "동기 읽기 중 예외 발생: %s", e.what());
-    sync_success = false;
-  }
 
-  if (!sync_success)
-  {
-    RCLCPP_WARN(this->get_logger(), "동기 상태 읽기 실패, 개별 모터 상태 읽기로 전환");
+    static int read_cycle = 0;
 
-    for (size_t index = 0; index < TOTAL_CONNECT_MOTORS; index++)
+    MotorStatus::MotorStatusConfig status;
+    dynamixel_rdk_msgs::msg::CurrentMotorStatus msg;
+    const size_t TOTAL_CONNECT_MOTORS = connected_motor_ids_.size();
+
+    // 연결된 모터가 없으면 리턴
+    if (TOTAL_CONNECT_MOTORS == 0) {
+      RCLCPP_WARN(this->get_logger(), "연결된 모터가 없습니다");
+      return;
+    }
+
+    // motor_status 벡터 크기 확인 및 조정
+    if (motor_status.size() < TOTAL_CONNECT_MOTORS) {
+      motor_status.resize(TOTAL_CONNECT_MOTORS);
+    }
+
+    ResizeMsg(msg, TOTAL_CONNECT_MOTORS);
+
+    std::vector<uint8_t> connected_motor_uint8_ids;
+    for (auto id : connected_motor_ids_)
     {
-      uint8_t id = connected_motor_uint8_ids[index];
-
-      if (motor_status_handler_->getCurrentPosition(id, status.position) &&
-          motor_status_handler_->getGoalPosition(id, status.goal_position) &&
-          motor_status_handler_->getCurrentVelocity(id, status.velocity) &&
-          motor_status_handler_->getInputVoltage(id, status.voltage) &&
-          motor_status_handler_->getCurrentTemperature(id, status.temperature) &&
-          motor_status_handler_->getCurrentTorque(id, status.torque) &&
-          motor_status_handler_->getMovingStatus(id, status.moving_status) &&
-          motor_status_handler_->HardwareErrorStatus(id, status.error_status))
-      {
-        msgUpdate(msg, index, status.position, status.goal_position, status.velocity, status.voltage,
-                  status.temperature, status.torque, status.moving_status, status.error_status);
-      }
-      else
-      {
-        RCLCPP_ERROR(this->get_logger(), "[ID:%d] 개별 상태 읽기 실패", id);
-      }
+      connected_motor_uint8_ids.push_back(static_cast<uint8_t>(id));
     }
-  }
-  else
-  {
-    for (size_t index = 0; index < TOTAL_CONNECT_MOTORS; index++)
+
+    //매번 모든 상태를 읽지 않고 번갈아가며 읽기
+    bool sync_success = false;
+    try {
+      if (read_cycle % 3 == 0) {
+        // 가장 중요한 위치와 목표위치만 읽기
+        sync_success =
+            motor_status_handler_->getCurrentPositionSync(connected_motor_uint8_ids, motor_status) &&
+            motor_status_handler_->getGoalPositionSync(connected_motor_uint8_ids, motor_status);
+        RCLCPP_DEBUG(this->get_logger(), "읽기 사이클 0: 위치 데이터");
+      } else if (read_cycle % 3 == 1) {
+        // 속도와 이동 상태 읽기
+        sync_success =
+            motor_status_handler_->getCurrentVelocitySync(connected_motor_uint8_ids, motor_status) &&
+            motor_status_handler_->getMovingStatusSync(connected_motor_uint8_ids, motor_status);
+        RCLCPP_DEBUG(this->get_logger(), "읽기 사이클 1: 속도/이동 데이터");
+      } else {
+        // 전압, 온도, 토크, 에러 상태 읽기
+        sync_success =
+            motor_status_handler_->getInputVoltageSync(connected_motor_uint8_ids, motor_status) &&
+            motor_status_handler_->getCurrentTemperatureSync(connected_motor_uint8_ids, motor_status) &&
+            motor_status_handler_->getCurrentTorqueSync(connected_motor_uint8_ids, motor_status) &&
+            motor_status_handler_->HardwareErrorStatusSync(connected_motor_uint8_ids, motor_status);
+        RCLCPP_DEBUG(this->get_logger(), "읽기 사이클 2: 전압/온도/토크/에러 데이터");
+      }
+      read_cycle++;
+    }
+    catch (const std::exception& e) {
+      RCLCPP_ERROR(this->get_logger(), "동기 읽기 중 예외 발생: %s", e.what());
+      sync_success = false;
+    }
+
+    if (!sync_success)
     {
-      msgUpdate(msg, index, motor_status[index].position, motor_status[index].goal_position, motor_status[index].velocity,
-                motor_status[index].voltage, motor_status[index].temperature, motor_status[index].torque,
-                motor_status[index].moving_status, motor_status[index].error_status);
+      RCLCPP_WARN(this->get_logger(), "동기 상태 읽기 실패, 개별 모터 상태 읽기로 전환");
+
+      for (size_t index = 0; index < TOTAL_CONNECT_MOTORS; index++)
+      {
+        uint8_t id = connected_motor_uint8_ids[index];
+
+        if (motor_status_handler_->getCurrentPosition(id, status.position) &&
+            motor_status_handler_->getGoalPosition(id, status.goal_position) &&
+            motor_status_handler_->getCurrentVelocity(id, status.velocity) &&
+            motor_status_handler_->getInputVoltage(id, status.voltage) &&
+            motor_status_handler_->getCurrentTemperature(id, status.temperature) &&
+            motor_status_handler_->getCurrentTorque(id, status.torque) &&
+            motor_status_handler_->getMovingStatus(id, status.moving_status) &&
+            motor_status_handler_->HardwareErrorStatus(id, status.error_status))
+        {
+          msgUpdate(msg, index, status.position, status.goal_position, status.velocity, status.voltage,
+                    status.temperature, status.torque, status.moving_status, status.error_status);
+        }
+        else
+        {
+          RCLCPP_ERROR(this->get_logger(), "[ID:%d] 개별 상태 읽기 실패", id);
+        }
+      }
     }
-  }
+    else
+    {
+      for (size_t index = 0; index < TOTAL_CONNECT_MOTORS; index++)
+      {
+        msgUpdate(msg, index, motor_status[index].position, motor_status[index].goal_position, motor_status[index].velocity,
+                  motor_status[index].voltage, motor_status[index].temperature, motor_status[index].torque,
+                  motor_status[index].moving_status, motor_status[index].error_status);
+      }
+    }
 
-  static int log_counter = 0;
-  if (log_counter++ % 20 == 0) {
-    RCLCPP_INFO(this->get_logger(), "모터 총 개수 : %zu", motor_ids_.size());
-    RCLCPP_INFO(this->get_logger(), "총 연결된 모터 개수 : %zu", TOTAL_CONNECT_MOTORS);
-  }
+    static int log_counter = 0;
+    if (log_counter++ % 20 == 0) {
+      RCLCPP_INFO(this->get_logger(), "모터 총 개수 : %zu", motor_ids_.size());
+      RCLCPP_INFO(this->get_logger(), "총 연결된 모터 개수 : %zu", TOTAL_CONNECT_MOTORS);
+    }
 
-  motor_status_pubisher_->publish(msg);
-}
+    motor_status_pubisher_->publish(msg);
+  }
   void dynamixel_rdk_ros2::dynamixel_control_callback(const dynamixel_rdk_msgs::msg::DynamixelControlMsgs &msg)
   {
     RCLCPP_INFO(this->get_logger(), "==========================================================");
